@@ -70,7 +70,7 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 			self.turret:addWeapon(weapon)
 		end
 
-		TurretGenerator.createStandardCooling(turret, coolingTime, 1)
+		TurretGenerator.createStandardCooling(self.turret, coolingTime, 1)
 
 		self.turret:clearWeapons()
 	end,
@@ -203,7 +203,7 @@ function TurretConstructor:getScale()
 	end
 
 	scale.coaxial = (scale.usedSlots >= 5)
-	scale.turningSpeed = lerp(scale.size, 0.5, 3, 1, 0.3) * self.rand:getFloat(0.8, 1.2) * self.turnSpeedFactor or 1
+	scale.turningSpeed = lerp(scale.size, 0.5, 3, 1, 0.3) * self.rand:getFloat(0.8, 1.2) * (self.turnSpeedFactor or 1)
 	scale.coaxialDamageScale = self.turret.coaxial and 3 or 1
 	scale.shotSizeFactor = scale.size * 2
 
@@ -217,7 +217,8 @@ function TurretConstructor:applyWeaponScale()
 			-- scale damage, etc. linearly with amount of used slots
 			weapon.damage = weapon.damage * self.scale.usedSlots * self.scale.coaxialDamageScale
 			weapon.reach = weapon.reach * self.scale.reachFactor
-			weapon.psize = weapon.psize * self.scale.shotSizeFactor
+			if weapon.isProjectile then weapon.psize = weapon.psize * self.scale.shotSizeFactor end
+			if weapon.isBeam then weapon.bwidth = weapon.bwidth * self.scale.shotSizeFactor end
 		end
 	end
 end
@@ -300,10 +301,8 @@ function TurretConstructor:new(rand, dps, tech, material, rarity, _type)
 	self:applyWeapons()
 	self:extraDescriptions()
 	self.turret:updateStaticStats()
-	local meta = getmetatable(self.turret) --[
-	meta.generationTable = self -- Adding the Turret table to the metatable for future reference; probably not required
 	setmetatable(self.Specialties, {__index = TurretConstructor.Specialties}) -- Probably needed to overwrite values in the specialties table
-	return setmetatable(self.turret, meta) --]
+	return self.turret
 end
 
 function TurretGenerator.populateGeneratorFunction() -- In its own function so it can be overwrote before runtime you should probably avoid doing that though
@@ -358,12 +357,12 @@ TurretGenerator.replaceFunctions(WeaponType.ChainGun,{
 })
 TurretGenerator.replaceFunctions(WeaponType.PointDefenseChainGun,{
 	getNumWeapons = function(self) return {self.rand:getInt(2,3)} end,
-	getGuaranteedSpecialtiesTable = {'AutomaticFire'},
+	getGuaranteedSpecialtiesTable = function(self) return {'AutomaticFire'} end,
 	turnSpeedFactor = 2,
 })
 TurretGenerator.replaceFunctions(WeaponType.PointDefenseLaser,{
 	getNumWeapons = function(self) return {1} end,
-	getGuaranteedSpecialtiesTable = {'AutomaticFire'},
+	getGuaranteedSpecialtiesTable = function(self) return {'AutomaticFire'} end,
 	turnSpeedFactor = 2,
 })
 TurretGenerator.replaceFunctions(WeaponType.Laser, {
@@ -425,7 +424,7 @@ TurretGenerator.replaceFunctions(WeaponType.RocketLauncher,{
 			self.turret:addWeapon(self.weapons[1])
 		end
 	end,
-	getGuaranteedSpecialtiesTable = {'Explosive'},
+	getGuaranteedSpecialtiesTable = function(self) return {'Explosive'} end,
 	applyCooling = function(self)
 		local shootingTime = 20 * self.rand:getFloat(0.8, 1.2)
 		local coolingTime = 15 * self.rand:getFloat(0.8, 1.2)
@@ -446,7 +445,7 @@ TurretGenerator.replaceFunctions(WeaponType.Cannon,{
 })
 TurretGenerator.replaceFunctions(WeaponType.RailGun,{
 	getNumWeapons = function(self) return {self.rand:getInt(1, 3)} end,
-	getGuaranteedSpecialtiesTable = {'Penetration'},
+	getGuaranteedSpecialtiesTable = function(self) return {'Penetration'} end,
 	applyCooling = function(self)
 		local shootingTime = 27.5 * self.rand:getFloat(0.8, 1.2)
 		local coolingTime = 10 * self.rand:getFloat(0.8, 1.2)
@@ -496,7 +495,7 @@ TurretGenerator.replaceFunctions(WeaponType.RepairBeam,{
 
 		else
 			-- just attach normally
-			TurretConstructor.attachWeapons(self)
+			TurretConstructor.applyWeapons(self)
 		end
 	end,
 })
@@ -573,12 +572,12 @@ TurretGenerator.replaceFunctions(WeaponType.PulseCannon,{
 			weapon.damage = weapon.damage * ((coolingTime + shootingTime) / shootingTime)
 		end
 	end,
-	getGuaranteedSpecialtiesTable = {'IonizedProjectile'},
+	getGuaranteedSpecialtiesTable = function(self) return {'IonizedProjectile'} end,
 	simultaneousShootingProbability = 0.25,
 	turnSpeedFactor = 1.2,
 })
 TurretGenerator.replaceFunctions(WeaponType.AntiFighter,{
 	getNumWeapons = function(self) return {self.rand:getInt(1,3)} end,
-	getGuaranteedSpecialtiesTable = {'Explosive', 'AutomaticFire'},
+	getGuaranteedSpecialtiesTable = function(self) return {'Explosive', 'AutomaticFire'} end,
 	turnSpeedFactor = 1.2,
 })
