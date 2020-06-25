@@ -1,0 +1,27 @@
+*
+!*/
+!.gitignore
+
+
+# Mods
+!/Bubbets_Command_Package/**
+!/Bubbets_UIElements/**
+!/ClaimableResourceAsteroids/**
+!/ConfigLoader/**
+!/Elongated_Turret_Factory/**
+!/ElongatedTurretSorting/**
+!/MiningPriority/**
+!/rank_supporter/**
+!/ranks_defaultmodification/**
+!/Ranks_Mod/**
+!/Reserved_slots/**
+!/Resource_Display_Ranks_Addon/**
+!/Scaling_Turret_System/**
+!/Sector_Manager_Ranks_Addon/**
+!/SectorOverviewRanksAddon/**
+!/System_Scanner_Craftable_Addon/**
+!/SystemsFactory/**
+!/TurretGeneratorRework/**
+!/Workshop_Ship_Spawns/**
+
+

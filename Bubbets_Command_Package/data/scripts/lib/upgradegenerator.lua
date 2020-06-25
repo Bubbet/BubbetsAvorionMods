@@ -1,0 +1,1 @@
+UpgradeGenerator.scripts = scripts -- fuck i hate that this isn't namespaced already

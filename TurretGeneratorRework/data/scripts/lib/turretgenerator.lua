@@ -131,7 +131,7 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		local maxDecrease = 0.6
 		local decrease = 0.1 + self.rand:getFloat(0, self.rarity.value / HighestRarity().value) * maxDecrease
 
-		TurretGenerator.createBatteryChargeCooling(self.turret, self.cooling.coolingTime * (1 - decrease), self.cooling.shootingTime)
+		TurretGenerator.createBatteryChargeCooling(self.turret, self.turret.coolingTime * (1 - decrease), self.turret.shootingTime)
 
 		local percentage = math.floor(decrease * 100)
 		self.turret:addDescription("%s%% Less Energy Consumption"%_T, string.format("%+i", percentage))
@@ -276,7 +276,7 @@ end
 function TurretConstructor:applyWeapons()
 	local places = {TurretGenerator.createWeaponPlaces(self.rand, #self.weapons)}
 	for k, v in pairs(self.weapons) do
-		v.localPosition = places[k] * self.turret.size * self.scale.size or 1
+		v.localPosition = places[k] * self.turret.size --* self.scale.size or 1 causes really disjointed turrets
 		self.turret:addWeapon(v)
 	end
 end
@@ -464,7 +464,7 @@ TurretGenerator.replaceFunctions(WeaponType.RepairBeam,{
 	applyWeapons = function(self)
 		if self.rand:test(0.125) == true then
 			local weapon = self:getWeapon()
-			weapon.localPosition = vec3(0.1, 0, 0) * self.scale.size
+			weapon.localPosition = vec3(0.1, 0, 0) --* self.scale.size
 			if weapon.shieldRepair > 0 then
 				weapon.bouterColor = ColorRGB(0.1, 0.2, 0.4)
 				weapon.binnerColor = ColorRGB(0.2, 0.4, 0.9)
@@ -476,7 +476,7 @@ TurretGenerator.replaceFunctions(WeaponType.RepairBeam,{
 			end
 			self.turret:addWeapon(weapon)
 
-			weapon.localPosition = vec3(-0.1, 0, 0) * self.scale.size
+			weapon.localPosition = vec3(-0.1, 0, 0) --* self.scale.size
 
 			-- swap the two properties
 			local shieldRepair = weapon.shieldRepair
