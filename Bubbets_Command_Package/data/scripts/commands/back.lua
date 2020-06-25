@@ -9,7 +9,7 @@ function execute(sender, _, ...)
     local sx, sy = player:getSectorCoordinates()
     player:setValue("commands_back_pos_x", sx)
     player:setValue("commands_back_pos_y", sy)
-    Galaxy():transferEntity(player.craft, x, y, 0)
+    Galaxy():invokeFunction('data/scripts/galaxy/galaxycommandhelperfunctions.lua', 'moveEntity', player, x, y)
 
     return val~=nil, "", "Sending " .. player.name .. " back."
 end

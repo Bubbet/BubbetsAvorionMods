@@ -10,7 +10,7 @@ function execute(sender, _, ...)
     splayer:setValue("commands_back_pos_y", y)
     local player = chf.findUser(args[1])
     local x, y = player:getSectorCoordinates()
-    Galaxy():transferEntity(splayer.craft, x, y, 0)
+    Galaxy():invokeFunction('data/scripts/galaxy/galaxycommandhelperfunctions.lua', 'moveEntity', splayer, x, y)
 
     return 1, "", "Teleporting " .. splayer.name .. " to " .. player.name
 end
