@@ -17,19 +17,20 @@ function DragList:secure()
 	local data = {}
 	for k, v in pairs(self.elements) do
 		local element_extra = v.onSecure and v:onSecure()
-		table.insert(data, {id = v.id, list_pos = v.list_pos, pos = v.container.position, extra = element_extra})
+		table.insert(data, {id = v.id, list_pos = v.list_pos, n_pos = v.container.position - self.container.position, extra = element_extra})
 	end
 	return data
 end
 
 function DragList:restore(data)
 	for k, v in pairs(data) do
+		if v.pos then return end -- cancel restore if old pos exists
 		local element = self.elements[v.id]
 		element.list_pos = v.list_pos
-		if type(v.pos) == 'table' then
-			v.pos = vec2(v.pos.x, v.pos.y) -- Weird vec2 being converted to table on secure from disk
+		if type(v.n_pos) == 'table' then
+			v.n_pos = vec2(v.n_pos.x, v.n_pos.y) -- Weird vec2 being converted to table on secure from disk
 		end
-		element.container.position = v.pos
+		element.container.position = self.container.position + v.n_pos
 		if element.onRestore then element:onRestore(v.extra) end
 	end
 end
