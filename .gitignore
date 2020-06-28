@@ -6,6 +6,7 @@
 # Mods
 !/Bubbets_Command_Package/**
 !/Bubbets_UIElements/**
+!/BuildingResourcesAsGoods/**
 !/ClaimableResourceAsteroids/**
 !/ConfigLoader/**
 !/Elongated_Turret_Factory/**
