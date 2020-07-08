@@ -2,7 +2,6 @@
 !*/
 !.gitignore
 
-
 # Mods
 !/Bubbets_Command_Package/**
 !/Bubbets_UIElements/**
@@ -21,9 +20,10 @@
 !/Scaling_Turret_System/**
 !/Sector_Manager_Ranks_Addon/**
 !/SectorOverviewRanksAddon/**
+!/StationHub/**
 !/System_Scanner_Craftable_Addon/**
 !/SystemsFactory/**
 !/TurretGeneratorRework/**
 !/Workshop_Ship_Spawns/**
 
-
+**todo.txt
