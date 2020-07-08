@@ -1,6 +1,6 @@
-local curSector = Sector()
 function SectorGenerator:createBigAsteroidEx(position, size, resources)
 
+    local curSector = Sector()
     local desc = AsteroidDescriptor()
     --desc:removeComponent(ComponentType.MineableMaterial)
     desc:addComponents(

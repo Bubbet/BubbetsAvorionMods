@@ -23,7 +23,9 @@ meta =
     authors = {"Bubbet!"},
 
     -- Version of your mod, should be in format 1.0.0 (major.minor.patch) or 1.0 (major.minor)
-    -- This will be used to check for unmet dependencies or incompatibilities
+    -- This will be used to check for unmet dependencies or incompatibilities, and to check compatibility between clients and dedicated servers with mods.
+    -- If a client with an unmatching major or minor mod version wants to log into a server, login is prohibited.
+    -- Unmatching patch version still allows logging into a server. This works in both ways (server or client higher or lower version).
     version = "1.0",
 
     -- If your mod requires dependencies, enter them here. The game will check that all dependencies given here are met.
@@ -44,7 +46,7 @@ meta =
     dependencies = {
         {id = "1691539727", min = "*.*", optional = true},
         {id = "2003555597", min = "1.0", optional = true},
-        {id = "Avorion", max = "1.0.*"}
+        {id = "Avorion", max = "1.1.*"}
     },
 
     -- Set to true if the mod only has to run on the server. Clients will get notified that the mod is running on the server, but they won't download it to themselves
