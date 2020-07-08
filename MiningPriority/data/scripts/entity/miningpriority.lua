@@ -15,7 +15,7 @@ function MiningPriority.interactionPossible(playerIndex, option)
 end
 
 function MiningPriority.getMiningList() -- invoked via mineAI
-	return MiningPriority.material_list
+	return MiningPriority.material_list, MiningPriority.ignoreOrder
 end
 
 function MiningPriority.getMaterialList() -- client
@@ -37,10 +37,11 @@ function MiningPriority.secure()
 	for k, v in pairs(MiningPriority.material_list or {}) do -- Materials cannot be sterilized and must be turned to a table of integers
 		table.insert(sec_mat_list, v.value)
 	end
-	return {dragList = MiningPriority.dragList, material_list = sec_mat_list}
+	return {ignoreOrder = MiningPriority.ignoreOrder, dragList = MiningPriority.dragList, material_list = sec_mat_list}
 end
 
 function MiningPriority.restore(data)
+	MiningPriority.ignoreOrder = data.ignoreOrder
 	MiningPriority.dragList = data.dragList
 	MiningPriority.material_list = {}
 	for k, v in pairs(data.material_list or {}) do
@@ -52,21 +53,29 @@ end
 function MiningPriority.fetch(data) -- from client to server
 	if onServer() then
 		if data then
+			MiningPriority.ignoreOrder = data.ignoreOrder
 			MiningPriority.dragList = data.dragList
 			MiningPriority.material_list = data.material_list
 		else
 			broadcastInvokeClientFunction('fetch')
 		end
 	else
-		invokeServerFunction('fetch', {dragList = dragList:secure(), material_list = MiningPriority.getMaterialList()})
+		invokeServerFunction('fetch', {ignoreOrder = ignoreOrderCheckbox.checked, dragList = dragList:secure(), material_list = MiningPriority.getMaterialList()})
 	end
 end
 callable(MiningPriority, 'fetch')
 
 function MiningPriority.sync(data) -- from server to client
 	if onClient() then
-		if data then
-			dragList:restore(data)
+		local i = 0 -- stupid workaround be cause 'if data then' was passing on a empty table
+		for _,_ in pairs(data or {}) do
+			i = i + 1
+		end
+		if i>0 then
+			dragList.check_box_initialized = false
+			ignoreOrderCheckbox.checked = data.ignoreOrder
+			dragList.check_box_initialized = true
+			dragList:restore(data.dragList)
 		else
 			invokeServerFunction('sync')
 		end
@@ -74,7 +83,7 @@ function MiningPriority.sync(data) -- from server to client
 		if not MiningPriority.dragList then
 			MiningPriority.fetch()
 		end
-		invokeClientFunction(Player(callingPlayer), 'sync', MiningPriority.dragList)
+		invokeClientFunction(Player(callingPlayer), 'sync', {ignoreOrder = MiningPriority.ignoreOrder, dragList = MiningPriority.dragList})
 	end
 end
 callable(MiningPriority, 'sync')
@@ -92,7 +101,7 @@ end
 function MiningPriority.initUI()
 
 	local res = getResolution()
-	local size = vec2(150, 220)
+	local size = vec2(150, 220 + 30)
 
 	local menu = ScriptUI()
 	local window = menu:createWindow(Rect(res * 0.5 - size * 0.5, res * 0.5 + size * 0.5))
@@ -102,7 +111,13 @@ function MiningPriority.initUI()
 	window.showCloseButton = true
 	window.moveable = true
 
-	dragList = UIDragList(MiningPriority, window, window)
+	local ignoreOrderNode, dragNode = Node(size):rows({20,1}, 10)
+	ignoreOrderCheckbox = window:createCheckBox(ignoreOrderNode:pad(10, 10, 10, 0).rect, 'Ignore Order', 'onCloseWindow')
+	ignoreOrderCheckbox.tooltip = 'Check to enable behavior closer to vanilla, ignoring the list ordering and only caring about if the resource is enabled.'
+	ignoreOrderCheckbox.checked = false
+	dragNode = window:createContainer(dragNode.rect)
+
+	dragList = UIDragList(MiningPriority, window, dragNode)
 
 	for k, v in pairs({Node(window.size):pad(10):rows({20,20,20,20,20,20,20}, 10, 10)}) do
 		dragList:createDragElement(v.rect, function(this)
