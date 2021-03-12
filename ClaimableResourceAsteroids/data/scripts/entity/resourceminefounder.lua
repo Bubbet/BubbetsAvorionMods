@@ -3,7 +3,10 @@ package.path = package.path .. ";data/scripts/entity/?.lua"
 package.path = package.path .. ";data/scripts/config/?.lua"
 local Config
 if ModManager():findEnabled("2003555597") then Config = include("ConfigLoader") else
-    print("[ClaimableResourceAsteroids] ConfigLoader not installed, falling back on local config.")
+    if onServer() and not Server():getValue('CRA_LocalAlert') then
+        print("[ClaimableResourceAsteroids] ConfigLoader not installed, falling back on local config.")
+        Server():setValue('CRA_LocalAlert', true)
+    end
     Config = include("resourcemineconfig")
 end
 
@@ -89,6 +92,7 @@ function ResourceMineFounder.foundFactory(goodName, productionIndex, name)
     entity:setMovePlan(plan)
     ]]
     rsmoldfoundFactory(goodName, productionIndex, name)
+    asteroid:setValue("map_marker", nil)
     --entity:setValue("factory_type", "resource_mine") -- This isnt doing anything at this point as the entity is cleaned up by now
 
     productionsByGood[goodName][productionIndex] = nil -- failsafe to keep resources out of regular mine founding

@@ -1,17 +1,17 @@
 
 --namespace TurretDesignUtility
-TurretDesignUtility = {}
+BuildMenuEnhancements = {}
 
 --[[
 	for _, block in pairs(Plan():getBlocksByType(BlockType.TurretBase)) do
 	end
 ]]
 
-function TurretDesignUtility.interactionPossible()
+function BuildMenuEnhancements.interactionPossible()
 	return Player().state == PlayerStateType.BuildCraft
 end
 
-function TurretDesignUtility.initUI()
+function BuildMenuEnhancements.initUI()
 	local res = getResolution()
 	local size = vec2(780, 580)
 
@@ -24,21 +24,21 @@ function TurretDesignUtility.initUI()
 	menu:registerWindow(window, "Turret Design Utility");
 end
 
-function TurretDesignUtility.onPostRenderHud(state)
+function BuildMenuEnhancements.onPostRenderHud(state)
 	if state ~= PlayerStateType.BuildCraft then
-		if TurretDesignUtility.visible then
-			TurretDesignUtility.visible = false
+		if BuildMenuEnhancements.visible then
+			BuildMenuEnhancements.visible = false
 			window:hide()
 		end
 		return
 	end
-	if not TurretDesignUtility.visible then
-		TurretDesignUtility.visible = true
+	if not BuildMenuEnhancements.visible then
+		BuildMenuEnhancements.visible = true
 		window:show()
 	end
 end
 
-function TurretDesignUtility.initialize()
+function BuildMenuEnhancements.initialize()
 	if onClient() then
 		--Player():registerCallback('onPostRenderHud','onPostRenderHud')
 	end

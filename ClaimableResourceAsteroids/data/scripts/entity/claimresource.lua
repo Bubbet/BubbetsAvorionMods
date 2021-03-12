@@ -47,10 +47,13 @@ function ClaimResource.onShowWindow()
     invokeServerFunction("claim")
     ScriptUI():stopInteraction()
 end
---[[
+
 function ClaimResource.initialize()
-    Entity():setValue("valuable_object", RarityType.Petty)
-end]]
+    local entity = Entity()
+    if entity.factionIndex ~= 0 then return end
+    entity:setValue("valuable_object", RarityType.Petty)
+    entity.type = EntityType.Asteroid
+end
 
 function ClaimResource.claim()
     local ok, msg = ClaimResource.interactionPossible(callingPlayer)
@@ -81,6 +84,8 @@ function ClaimResource.claim()
     entity:addScriptOnce("resourceminefounder.lua")
     entity:addScriptOnce("unclaimresource.lua")
     entity:setValue("valuable_object", nil)
+    entity:setValue("map_marker", "Claimed " .. entity:getMineableMaterial().name .. " Asteroid")
+    entity.type = EntityType.Unknown
     --entity:addScriptOnce("sellobject.lua")
     if ModManager():findEnabled("1691539727") then
       entity:addScriptOnce("data/scripts/entity/moveAsteroid.lua")

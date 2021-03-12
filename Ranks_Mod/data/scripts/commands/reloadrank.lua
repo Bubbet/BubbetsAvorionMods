@@ -9,8 +9,8 @@ function execute(sender, _, ...)
     --if rank == "default" then return 0, "", "You cannot reset default welcome mail.(it'd be a ton of extra work to integrate this)" end
     if not rank then rank = args[1] end
     if rank then
-        err, success = Galaxy():invokeFunction("data/scripts/galaxy/ranks.lua", "addrankfile", rank)
-        if success then
+        err, success = Galaxy():invokeFunction("data/scripts/galaxy/ranks.lua", "reloadRank", rank)
+        if err then
             output = "Reloaded " .. rank
         end
     end

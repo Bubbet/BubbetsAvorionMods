@@ -15,7 +15,7 @@ if onClient() then
         ui.turrets = ui.tab:createInventorySelection(ui.vsplit.right, 8)
         local player = Galaxy():getPlayerCraftFaction()
         ui.turrets:fill(player.index, InventoryItemType.Turret)
-        ui.sortlist = UISortList(ETurretSorting, ui.tab, ui.vsplit.left, ui.turrets)
+        ui.sortlist = UISortList(ETurretSorting, ui.tab, ui.vsplit.left, ui.turrets, true)
 
         ETurretSorting.ui = ui
     end

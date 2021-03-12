@@ -4,17 +4,17 @@ include('ElementToTable')
 Node = include('node')
 
 -- namespace TurretDesignUtility
-TurretDesignUtility = {}
-self = TurretDesignUtility
+BuildMenuEnhancements = {}
+self = BuildMenuEnhancements
 
 if onClient() then
-	function TurretDesignUtility.initialize()
+	function BuildMenuEnhancements.initialize()
 		local player = Player()
 		player:registerCallback("onStateChanged", "onPlayerStateChanged")
-		TurretDesignUtility.initUI()
+		BuildMenuEnhancements.initUI()
 	end
 
-	function TurretDesignUtility.initUI()
+	function BuildMenuEnhancements.initUI()
 		local res = getResolution()
 		local size = vec2(147, 192.5)
 		local position = vec2(0, res.y - size.y - 20)
@@ -73,7 +73,7 @@ if onClient() then
 		self.apply_window:hide()
 	end
 
-	function TurretDesignUtility.onPlayerStateChanged(new,  old)
+	function BuildMenuEnhancements.onPlayerStateChanged(new, old)
 		if new == PlayerStateType.BuildCraft then
 			self.window:show()
 		else
@@ -83,12 +83,12 @@ if onClient() then
 	end
 
 
-	function TurretDesignUtility.applyAll()
+	function BuildMenuEnhancements.applyAll()
 		self.apply_window:show()
 		self.design_selection:refreshTopLevelFolder()
 	end
 
-	function TurretDesignUtility.design_selected()
+	function BuildMenuEnhancements.design_selected()
 		local selected = self.design_selection.selected
 		if selected then -- and selected.type == SavedDesignType.TurretDesign then
 			if selected.type ~= SavedDesignType.TurretDesign then
@@ -103,7 +103,7 @@ if onClient() then
 		self.apply_window:hide()
 	end
 
-	function TurretDesignUtility.exportAll()
+	function BuildMenuEnhancements.exportAll()
 		local id = Player().craft.id
 		print(CraftDesign().numTurrets)
 		print(TurretDesign())

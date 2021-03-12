@@ -7,7 +7,7 @@ function execute(sender, _, ...)
 
   if player and rank then
     err, success = Galaxy():invokeFunction("data/scripts/galaxy/ranks.lua", "giveMail", rank, player)
-    if success then
+    if err then
       output = "Gave " .. player.name .. " a " .. rank .. " mail package."
     end
   end

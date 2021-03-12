@@ -1,227 +1,274 @@
 package.path = package.path .. ";data/scripts/lib/?.lua"
 package.path = package.path .. ";data/scripts/config/?.lua"
 
-UpgradeGenerator = include("upgradegenerator")
-SystemIngredients = include("systemingredients")
-include("galaxy")
-include("systemupgradeblueprint")
-include("callable")
-
 local Config
 if ModManager():findEnabled("2003555597") then Config = include("ConfigLoader") else
-    print("[ClaimableResourceAsteroids] ConfigLoader not installed, falling back on local config.")
-    Config = include("systemfactoryconfig")
+	if onServer() and not Server():getValue('CRA_LocalAlert') then
+		print("[ClaimableResourceAsteroids] ConfigLoader not installed, falling back on local config.")
+		Server():setValue('CRA_LocalAlert', true)
+	end
+	Config = include("systemfactoryconfig")
 end
+
+include('ElementToTable')
+local Node = include('gravyui/node')
+local systemIngredients = include('systemingredients')
 
 -- namespace SystemFactory
 SystemFactory = {}
 
-function SystemFactory.initUI()
-    local res = getResolution()
-    local size = vec2(780, 580)
+local ConfigurationMode =
+{
+	InventorySystem = 1,
+	FactorySystem = 2,
+}
+local configurationMode
 
-    local menu = ScriptUI()
-    window = menu:createWindow(Rect(res * 0.5 - size * 0.5, res * 0.5 + size * 0.5))
+function SystemFactory:initialize()
 
-    window.caption = "System Factory"%_t
-    window.showCloseButton = 1
-    window.moveable = 1
-    menu:registerWindow(window, "Build Systems /*window title*/"%_t);
-
-    local tabbedWindow = window:createTabbedWindow(Rect(vec2(10, 10), size - 10))
-
-    local buildSystemsTabExtra = {}
-    buildSystemsTab = tabbedWindow:createTab("", "data/textures/icons/circuitry.png", "Build Systems")
-    SystemFactory.initBuildSystemsUI(buildSystemsTab, buildSystemsTabExtra)
-
-    --makeBlueprintsTab = tabbedWindow:createTab("", "data/textures/icons/system-blueprint.png", "Blueprint your systems")
-    --SystemFactory.initBlueprintsUI(makeBlueprintsTab)
-
-    SystemFactory.ui = {res=res, size=size, menu=menu, tabbedWindow=tabbedWindow, buildSystemsTabExtra=buildSystemsTabExtra}
 end
 
-function SystemFactory.initialize()
-    print("test")
-    SystemUpgradeBlueprint("data/scripts/systems/arbitrarytcs.lua", Rarity(1), Seed(1))
+function SystemFactory:interactionPossible()
+	return true
+end
+
+local lines = {}
+
+function SystemFactory:initUI()
+	local res = getResolution()
+	local size = vec2(780, 580)
+
+	local menu = ElementToTable(ScriptUI())
+	window = menu:createWindow(Rect(res * 0.5 - size * 0.5, res * 0.5 + size * 0.5))
+
+	window.caption = "System Factory"%_t
+	window.showCloseButton = 1
+	window.moveable = 1
+	menu:registerWindow(window.element, "Build Systems /*window title*/"%_t);
+
+	local tabbedWindow = window:createTabbedWindow(Rect(vec2(10, 10), size - 10))
+	buildSystemsTab = tabbedWindow:createTab("", "data/textures/icons/circuitry.png", "Build Systems")
+	buildSystemsTab.node = Node(Rect(buildSystemsTab.size))
+	SystemFactory.initBuildSystemsUI(buildSystemsTab)
+
 end
 
 ---@param tab Tab
----@param extra table
-function SystemFactory.initBuildSystemsUI(tab, extra)
-    tab.onSelectedFunction = "refreshBuildSystemsUI"
-    tab.onShowFunction = "refreshBuildSystemsUI"
-    extra.vertical_split = UIVerticalSplitter(Rect(vec2(),tab.size), 10, 0, 0.4)
-    extra.right_frame = tab:createFrame(extra.vertical_split.right)
-    extra.horizontal_split = UIHorizontalSplitter(extra.vertical_split.left, 10, 0, 0.25)
-    extra.horizontal_split_top_rect = extra.horizontal_split.top
-    extra.horizontal_split_top_rect.size = vec2(75)
-    selectedBlueprintSelection = tab:createSelection(extra.horizontal_split_top_rect, 1)
-    selectedBlueprintSelection.dropIntoEnabled = 1
-    selectedBlueprintSelection.entriesSelectable = 0
-    selectedBlueprintSelection.onReceivedFunction = "onBlueprintReceived"
-    extra.bottom_horizontal_split = UIHorizontalSplitter(extra.horizontal_split.bottom, 10, 0, 0.5)
-    extra.bottom_horizontal_split.topSize = 25
-    extra.blueprint_type_combo = tab:createComboBox(extra.bottom_horizontal_split.top,"onBlueprintTypeSelected")
-    extra.blueprint_type_combo:addEntry("Factory Blueprints"%_t)
-    extra.blueprint_type_combo:addEntry("Inventory Blueprints"%_t)
-    inventoryBlueprintSelection = tab:createInventorySelection(extra.bottom_horizontal_split.bottom, 5)
-    inventoryBlueprintSelection.dragFromEnabled = 1
-    inventoryBlueprintSelection.onClickedFunction = "onBlueprintSelectionClicked"
-    inventoryBlueprintSelection:hide()
-    predefinedBlueprintSelection = tab:createInventorySelection(extra.bottom_horizontal_split.bottom, 5)
-    predefinedBlueprintSelection.dragFromEnabled = 1
-    predefinedBlueprintSelection.onClickedFunction = "onBlueprintSelectionClicked"
-    extra.lister = UIVerticalLister(extra.vertical_split.right, 10, 10)
-    extra.right_vertical_split_rect = extra.lister:placeCenter(vec2(extra.lister.inner.width, 30))
-    extra.right_vertical_split = UIArbitraryVerticalSplitter(extra.right_vertical_split_rect, 10, 5, 320, 370)
-    extra.right_parts_label = tab:createLabel(extra.right_vertical_split:partition(0).lower, "Parts"%_t, 14)
-    extra.right_req_label = tab:createLabel(extra.right_vertical_split:partition(1).lower, "Req"%_t, 14)
-    extra.right_you_label = tab:createLabel(extra.right_vertical_split:partition(2).lower, "You"%_t, 14)
-    extra.right_lines = {}
-    for i = 1, 15 do
-        local rect = extra.lister:placeCenter(vec2(extra.lister.inner.width, 30))
-        local vsplit = UIArbitraryVerticalSplitter(rect, 10, 7, 20, 250, 280, 310, 320, 370)
-        local frame = tab:createFrame(rect)
-        local i = 0
-        local icon = tab:createPicture(vsplit:partition(i), ""); i = i + 1
-        local materialLabel = tab:createLabel(vsplit:partition(i).lower, "", 14); i = i + 1
-        local plus = tab:createButton(vsplit:partition(i), "+", "onPlus"); i = i + 1
-        local minus = tab:createButton(vsplit:partition(i), "-", "onMinus"); i = i + 2
-        local requiredLabel = tab:createLabel(vsplit:partition(i).lower, "", 14); i = i + 1
-        local youLabel = tab:createLabel(vsplit:partition(i).lower, "", 14); i = i + 1
-        icon.isIcon = 1
-        minus.textSize = 12
-        plus.textSize = 12
-        local hide = function(self)
-            self.icon:hide()
-            self.frame:hide()
-            self.material:hide()
-            self.plus:hide()
-            self.minus:hide()
-            self.required:hide()
-            self.you:hide()
-        end
-        local show = function(self)
-            self.icon:show()
-            self.frame:show()
-            self.material:show()
-            self.plus:show()
-            self.minus:show()
-            self.required:show()
-            self.you:show()
-        end
-        local line =  {rect = rect, vsplit = vsplit, frame = frame, icon = icon, plus = plus, minus = minus, material = materialLabel, required = requiredLabel, you = youLabel, hide = hide, show = show}
-        line:hide()
-        table.insert(extra.right_lines, line)
-    end
-    extra.right_organizer = UIOrganizer(extra.vertical_split.right)
-    extra.right_rect = extra.right_organizer:getBottomRect(Rect(vec2(extra.vertical_split.right.width,60)))
-    extra.right_bottom_vertical_split = UIVerticalSplitter(extra.right_rect, 10, 10, 0.9)
-    buildButton = tab:createButton(extra.right_bottom_vertical_split.left, "Build /*Turret Factory Button*/"%_t, "onBuildSystemPressed")
-    saveButton = tab:createButton(extra.right_bottom_vertical_split.right, "", "onTrackIngredientsButtonPressed")
-    saveButton.icon = "data/textures/icons/checklist.png"
-    saveButton.tooltip = "Track ingredients in mission log"%_t
-    priceLabel = tab:createLabel(vec2(extra.vertical_split.right.lower.x, extra.vertical_split.right.upper.y) + vec2(12, -75), "Manufacturing Price: Too Much"%_t, 16)
-    return tab, extra
-end
+function SystemFactory.initBuildSystemsUI(tab)
+	tab.left, tab.right = tab.node:cols({0.3, 0.7}, 10)
 
-function SystemFactory.getCoordinates()
-    if not SystemFactory.coords then
-        SystemFactory.coords = {}
-        SystemFactory.coords.x, SystemFactory.coords.y = Sector():getCoordinates()
-    end
+	tab.left.top, tab.left.bottom = tab.left:rows({0.25, 0.75}, 10)
+	tab.left.top.frame = tab:createFrame(tab.left.top)
 
-    return SystemFactory.coords.x, SystemFactory.coords.y
+	selectedBlueprintSelection = tab:createSelection(tab.left.top:centeredrect(75, 75), 1)
+	selectedBlueprintSelection.dropIntoEnabled = 1
+	selectedBlueprintSelection.entriesSelectable = 0
+	selectedBlueprintSelection.onReceivedFunction = "onBlueprintReceived"
+
+	tab.left.bottom.top, tab.left.bottom.bottom = tab.left.bottom:rows({25, 1}, 10)
+
+	tab.left.bottom.top.combo = tab:createComboBox(tab.left.bottom.top, '') -- 'onBlueprintTypeSelected'
+	tab.left.bottom.top.combo:addEntry("Factory Blueprints"%_t)
+	tab.left.bottom.top.combo:addEntry("Inventory Blueprints"%_t)
+
+	inventoryBlueprintSelection = tab:createInventorySelection(tab.left.bottom.bottom, 5)
+	inventoryBlueprintSelection.dragFromEnabled = 1
+	inventoryBlueprintSelection.onClickedFunction = "onBlueprintSelectionClicked"
+	inventoryBlueprintSelection:hide()
+
+	predefinedBlueprintSelection = tab:createInventorySelection(tab.left.bottom.bottom, 5)
+	predefinedBlueprintSelection.dragFromEnabled = 1
+	predefinedBlueprintSelection.onClickedFunction = "onBlueprintSelectionClicked"
+
+	-- Right Side
+	tab.right = tab.right:pad(10)
+	tab:createFrame(tab.right.parentNode)
+
+	tab.right.splits = {tab.right:rows({30, 30,30,30,30,30, 30,30,30, 30,30, 1, 50}, 10)}
+	tab.right.top = table.remove(tab.right.splits, 1)
+	tab.right.bottom = table.remove(tab.right.splits, #tab.right.splits)
+	table.remove(tab.right.splits, #tab.right.splits) -- removing spacer between rows and bottom
+
+	tab.right.top.parts, tab.right.top.req, tab.right.top.you = tab.right.top:pad(5):cols({1, 50, 50}, 10)
+	tab.right.top.parts.label = tab:createLabel(tab.right.top.parts, "Parts"%_t, 14):setLeftAligned()
+	tab.right.top.req.label = tab:createLabel(tab.right.top.req, "Req"%_t, 14):setLeftAligned()
+	tab.right.top.you.label = tab:createLabel(tab.right.top.you, "You"%_t, 14):setLeftAligned()
+
+	for _, v in pairs(tab.right.splits) do
+		local frame = tab:createFrame(v)
+		v.splits = {v:pad(5):cols({20,1,50,50}, 10)}--[[
+		for k1, v1 in pairs(v.splits) do
+			local ta = tab:createFrame(v1)
+			ta.backgroundColor = ColorHSV(0,1,1)
+		end--]]
+		local i = 1
+
+		local icon = tab:createPicture(v.splits[i], ""); i = i + 1
+		local materialLabel = tab:createLabel(v.splits[i], "", 14); i = i + 1
+		materialLabel:setLeftAligned()
+		local requiredLabel = tab:createLabel(v.splits[i], "", 14); i = i + 1
+		requiredLabel:setLeftAligned()
+		local youLabel = tab:createLabel(v.splits[i], "", 14); i = i + 1
+		youLabel:setLeftAligned()
+
+		icon.isIcon = 1
+
+		local hide = function(self)
+			self.icon:hide()
+			self.frame:hide()
+			self.material:hide()
+			self.required:hide()
+			self.you:hide()
+		end
+
+		local show = function(self)
+			self.icon:show()
+			self.frame:show()
+			self.material:show()
+			self.required:show()
+			self.you:show()
+		end
+
+		local line =  {frame = frame, icon = icon, material = materialLabel, required = requiredLabel, you = youLabel, hide = hide, show = show}
+		line:hide()
+
+		v.line = line
+		table.insert(lines, line)
+	end
+
+	tab.right.bottom.left, tab.right.bottom.right = tab.right.bottom:cols({0.9, 0.1}, 10)
+	buildButton = tab:createButton(tab.right.bottom.left, "Build /*Turret Factory Button*/"%_t, "onBuildSystemPressed")
+	saveButton = tab:createButton(tab.right.bottom.right, "", "onTrackIngredientsButtonPressed")
+	saveButton.icon = "data/textures/icons/checklist.png"
+	saveButton.tooltip = "Track ingredients in mission log"%_t
+	priceLabel = tab:createLabel(vec2(tab.right.bottom.left.rect.lower.x, tab.right.bottom.left.rect.upper.y) + vec2(0, -75), "Manufacturing Price: Too Much"%_t, 16)
 end
 
 function SystemFactory.getPossibleSystemTypes()
-    local systemTypes = {}
-    local probabilities = Balancing_GetSystemProbability(SystemFactory.getCoordinates())
-    for type, probability in pairs(probabilities) do
-
-        for k, t in pairs(SystemIngredients) do
-            if k == type then
-                systemTypes[k] = k
-            end
-        end
-    end
-
-    return systemTypes
+	local temp = {}
+	for k, v in pairs(systemIngredients) do
+		table.insert(temp, k)
+	end
+	return temp
 end
 
-function SystemFactory.refreshBuildSystemsUI()
-    local buyer = Galaxy():getPlayerCraftFaction()
-    --inventoryBlueprintSelection:fill(buyer.index, InventoryItemType.TurretTemplate)
-
-    local rarities = {Rarity(RarityType.Common), Rarity(RarityType.Uncommon), Rarity(RarityType.Rare)}
-    if buyer:getRelations(Faction().index) >= 80000 then
-        table.insert(rarities, Rarity(RarityType.Exceptional))
-    end
-
-    local first = nil
-    predefinedBlueprintSelection:clear()
-    for _, systemType in pairs(SystemFactory.getPossibleSystemTypes()) do
-        for _, rarity in pairs(rarities) do
-            local item = InventorySelectionItem()
-            item.item = SystemUpgradeBlueprint(systemType, rarity, Seed(1))--SystemFactory.getMaterial())
-            predefinedBlueprintSelection:add(item)
-
-            if not first then first = item end
-        end
-    end
-
-    selectedBlueprintSelection:clear()
-    selectedBlueprintSelection:addEmpty()
-
-    --TurretFactory.placeBlueprint(first, ConfigurationMode.FactoryTurret)
+function SystemFactory.getTechLevel()
+	return 30
 end
 
-function SystemFactory.onShowWindow()
-    --window.caption = "Tech ${level} - Turret Factory"%_t % {level = TurretFactory.getTechLevel()}
-    ---@type vec3
-    local velocity_a = ReadOnlyVelocity(Player().craft.id).velocity
-    velocity_a
-    if buildSystemsTab.isActiveTab then
-        SystemFactory.refreshBuildSystemsUI()
-    else
-        --TurretFactory.refreshMakeBlueprintsUI()
-    end
+function SystemFactory.getUIItem()
+	return selectedBlueprintSelection:getItem(ivec2(0)).item
 end
 
-function SystemFactory.onBlueprintTypeSelected(combo, selectedIndex)
-    predefinedBlueprintSelection.visible = (selectedIndex == 0)
-    --inventoryBlueprintSelection.visible = (selectedIndex == 1)
+function SystemFactory.getUIIngredients()
+	return systemIngredients[SystemFactory.getUIItem().script]
+end
+
+function SystemFactory.getUIRarity()
+	return SystemFactory.getUIItem().rarity
+end
+
+function SystemFactory.getUIPrice()
+	return SystemFactory.getUIItem().price
+end
+
+function SystemFactory.refreshIngredientsUI()
+	local ingredients = SystemFactory.getUIIngredients()
+	local rarity = SystemFactory.getUIRarity()
+
+	for i, line in pairs(lines) do
+		line:hide()
+	end
+
+	local ship = Entity(Player().craftIndex)
+	if not ship then return end
+
+	for i, ingredient in pairs(ingredients) do
+		local line = lines[i]
+		line:show()
+
+		local good = goods[ingredient.name]:good()
+
+		local needed = ingredient.amount
+		local have = ship:getCargoAmount(good) or 0
+
+		line.icon.picture = good.icon
+		line.material.caption = good:displayName(needed)
+		line.required.caption = needed
+		line.you.caption = have
+
+		if have < needed then
+			line.you.color = ColorRGB(1, 0, 0)
+		else
+			line.you.color = ColorRGB(1, 1, 1)
+		end
+	end
+
+	priceLabel.caption = "Manufacturing Cost: ¢${money}"%_t % {money = createMonetaryString(SystemFactory.getUIPrice())}--manufacturingPrice)}
 end
 
 function SystemFactory.onBlueprintSelected()
+	local buyer = Galaxy():getPlayerCraftFaction()
+
+	if configurationMode == ConfigurationMode.InventorySystem then
+		--configuredIngredients, manufacturingPrice = SystemFactory.getDuplicatedTurretIngredientsAndTax(SystemFactory.getUIBlueprint(), buyer)
+	else
+		--configuredIngredients, manufacturingPrice = SystemFactory.getNewTurretIngredientsAndTax(TurretFactory.getUIWeaponType(), TurretFactory.getUIRarity(), TurretFactory.getMaterial(), buyer)
+	end
+
+	SystemFactory.refreshIngredientsUI()
 end
 
 function SystemFactory.placeBlueprint(item, mode)
-    item.amount = 1
+	item.amount = 1
 
-    selectedBlueprintSelection:clear()
-    selectedBlueprintSelection:add(item)
+	selectedBlueprintSelection:clear()
+	selectedBlueprintSelection:add(item)
 
-    --configurationMode = mode
+	configurationMode = mode
 
-    SystemFactory.onBlueprintSelected()
+	SystemFactory.onBlueprintSelected()
 end
 
 function SystemFactory.onBlueprintSelectionClicked(selectionIndex, kx, ky, item, button)
-    --local mode = ConfigurationMode.InventoryTurret
-    --if selectionIndex == predefinedBlueprintSelection.selection.index then
-        --mode = ConfigurationMode.FactoryTurret
-    --end
+	local mode = ConfigurationMode.InventorySystem
+	if selectionIndex == predefinedBlueprintSelection.selection.index then
+		mode = ConfigurationMode.FactorySystem
+	end
 
-    SystemFactory.placeBlueprint(item)--, mode)
+	SystemFactory.placeBlueprint(item, mode)
 end
 
-function SystemFactory.interactionPossible(playerIndex, option)
-    return CheckFactionInteraction(playerIndex, 30000)
+function SystemFactory.refreshBuildSystemsUI()
+	local buyer = Galaxy():getPlayerCraftFaction()
+
+	local rarities = {Rarity(RarityType.Common), Rarity(RarityType.Uncommon), Rarity(RarityType.Rare)}
+	if buyer:getRelations(Faction().index) >= 80000 then
+		table.insert(rarities, Rarity(RarityType.Exceptional))
+	end
+
+	local seed = Seed()
+	local first
+	predefinedBlueprintSelection:clear()
+	for _, systemType in pairs(SystemFactory.getPossibleSystemTypes()) do
+		---@param rarity Rarity
+		for _, rarity in pairs(rarities) do
+			local item = InventorySelectionItem()
+			print('value', rarity.name, systemType)
+			item.item = SystemUpgradeTemplate(systemType, rarity, seed)
+			predefinedBlueprintSelection:add(item)
+			if not first then first = item end
+		end
+	end
+
+	selectedBlueprintSelection:clear()
+	selectedBlueprintSelection:addEmpty()
+
+	SystemFactory.placeBlueprint(first, ConfigurationMode.FactorySystem)
 end
 
-function SystemFactory.give()
-    Player(callingPlayer):getInventory():add(SystemUpgradeBlueprint("data/scripts/systems/arbitrarytcs.lua", Rarity(1), Seed(1)))
-    Player(callingPlayer):getInventory():add(SystemUpgradeBlueprint("data/scripts/systems/batterybooster.lua", Rarity(1), Seed(1)))
+function SystemFactory.onShowWindow()
+	window.caption = "Tech ${level} - System Factory"%_t % {level = SystemFactory.getTechLevel()}
+
+	SystemFactory.refreshBuildSystemsUI()
 end
-callable(SystemFactory, "give")

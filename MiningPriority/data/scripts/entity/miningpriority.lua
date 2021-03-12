@@ -112,12 +112,13 @@ function MiningPriority.initUI()
 	window.moveable = true
 
 	local ignoreOrderNode, dragNode = Node(size):rows({20,1}, 10)
-	ignoreOrderCheckbox = window:createCheckBox(ignoreOrderNode:pad(10, 10, 10, 0).rect, 'Ignore Order', 'onCloseWindow')
-	ignoreOrderCheckbox.tooltip = 'Check to enable behavior closer to vanilla, ignoring the list ordering and only caring about if the resource is enabled.'
-	ignoreOrderCheckbox.checked = false
 	dragNode = window:createContainer(dragNode.rect)
 
 	dragList = UIDragList(MiningPriority, window, dragNode)
+
+	ignoreOrderCheckbox = window:createCheckBox(ignoreOrderNode:pad(10, 10, 10, 0).rect, 'Ignore Order', 'onCloseWindow')
+	ignoreOrderCheckbox.tooltip = 'Check to enable behavior closer to vanilla, ignoring the list ordering and only caring about if the resource is enabled.'
+	ignoreOrderCheckbox.checked = false
 
 	for k, v in pairs({Node(window.size):pad(10):rows({20,20,20,20,20,20,20}, 10, 10)}) do
 		dragList:createDragElement(v.rect, function(this)

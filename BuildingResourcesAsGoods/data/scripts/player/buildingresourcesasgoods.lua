@@ -81,11 +81,12 @@ function BuildingResourcesAsGoods.onResourcesChanged(_, resources)
 		return
 	end
 
+	local player = Player()
+	if not player.craft.playerOwned then return end
+	print(BuildingResourcesAsGoods.setting)
 	if BuildingResourcesAsGoods.setting then
 		deferredCallback(0, 'setSetting', false) --BuildingResourcesAsGoods.setting) = false
 	else
-		local player = Player()
-
 		local cargoBay = CargoBay(player.craft)
 		for k, v in pairs(resources) do
 			local name = nameByMaterial[k]
@@ -107,6 +108,7 @@ callable(BuildingResourcesAsGoods, 'onResourcesChanged')
 
 function BuildingResourcesAsGoods.onShipChanged(playerIndex, craftId)
 	local entity = Entity(craftId)
+	if not entity.playerOwned then return end
 	local resources = {}
 	for k, v in pairs(nameByMaterial) do
 		resources[k] = entity:getCargoAmount(v) or 0

@@ -1,5 +1,12 @@
 ---@param ship Entity
-function MineAI.instance.findObject(ship, sector, harvestMaterial, depth)
+function MineAI.instance:findObject(ship, sector, harvestMaterial, depth)
+	if type(self) ~= "table" then
+		depth = harvestMaterial
+		harvestMaterial = sector
+		sector = ship
+		ship = self
+		self = MineAI.instance
+	end
 	local objectToHarvest
 	local higherMaterialPresent
 	depth = depth or 1
@@ -61,7 +68,7 @@ function MineAI.instance.findObject(ship, sector, harvestMaterial, depth)
 	if not objectToHarvest and depth < 7 and not ignoreOrder then
 		--print('going deeper, nothing found', depth)
 		depth = depth + 1
-		objectToHarvest, higherMaterialPresent = MineAI.instance.findObject(ship, sector, harvestMaterial, depth)
+		objectToHarvest, higherMaterialPresent = MineAI.instance:findObject(ship, sector, harvestMaterial, depth)
 	end
 
 	return objectToHarvest, higherMaterialPresent

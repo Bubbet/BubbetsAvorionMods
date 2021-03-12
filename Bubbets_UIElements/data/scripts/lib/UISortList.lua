@@ -10,8 +10,11 @@ SortList.elements = {} -- used in button functions to find current element(self)
 function SortList:cloneInv(in_table)
     self._turrets = {}
     for _, v in pairs(in_table or self._inventory:getItems()) do
-        if v.item.__avoriontype == "InventoryTurret" or v.item.__avoriontype == "TurretTemplate" then
+        if self._is_turrets and (v.item.__avoriontype == "InventoryTurret" or v.item.__avoriontype == "TurretTemplate") then
             table.insert(self._turrets, {InventoryReference = v, Tooltip = makeTurretTooltip(v.item, nil, 2)})
+        end
+        if not self._is_turrets and (v.item.__avoriontype == "SystemUpgradeTemplate") then
+            table.insert(self._turrets, {InventoryReference = v, Tooltip = v.item.tooltip})
         end
     end
 end
@@ -19,6 +22,7 @@ end
 function SortList:fillLines()
     self._lines = self._lines or {}
     self._linetypes = {}
+    local manufacturingPrice = false
     for _, v in pairs(self._turrets) do
         v.stats = {}
         for _, line in pairs({ v.Tooltip:getLines()}) do
@@ -26,16 +30,33 @@ function SortList:fillLines()
             local rtext = tonumber(trim(line.rtext:match("%d+")))
             if not self._ignorelines[text] and type(rtext) == "number" then
                 self._linetypes[text] = text
-                v.stats[text] = rtext
+                if v.stats[text] then -- Adds multiple lines together
+                    v.stats[text] = v.stats[text] + rtext
+                else
+                    v.stats[text] = rtext
+                end
             end
         end
-        v.stats["Damage Type"] = v.InventoryReference.item.damageType
-        v.stats.Material = v.InventoryReference.item.material.value
+        if self._is_turrets then
+            if v.manufacturingPrice then
+                v.stats["Manufacturing Price"] = v.manufacturingPrice
+                manufacturingPrice = true
+            end
+            v.stats["Damage Type"] = v.InventoryReference.item.damageType
+            v.stats.Material = v.InventoryReference.item.material.value
+            v.stats.Coaxial = v.InventoryReference.item.coaxial and 1 or 0
+        end
         v.stats.Rarity = v.InventoryReference.item.rarity.value
         v.stats.Price = v.Tooltip.price
     end
-    self._linetypes["Damage Type"] = "Damage Type"
-    self._linetypes["Material"] = "Material"
+    if self._is_turrets then
+        if manufacturingPrice then
+            self._linetypes["Manufacturing Price"] = "Manufacturing Price"
+        end
+        self._linetypes["Damage Type"] = "Damage Type"
+        self._linetypes["Material"] = "Material"
+        self._linetypes["Coaxial"] = "Coaxial"
+    end
     self._linetypes["Rarity"] = "Rarity"
     self._linetypes["Price"] = "Price"
     local temp = {}
@@ -56,6 +77,7 @@ function SortList:fillLines()
             line.stat_frame.backgroundColor = ColorARGB(0.7,0,0,0)
             line.stat = self._scrollframe:createLabel(line.vertical_split:partition(i).lower+vec2(2.5,2.5), v, 14)
             line.stat.shortenText = true
+            line.stat.tooltip = v
             line.stat.size = line.vertical_split:partition(i).size; i = i + 1
             line.text_box = self._scrollframe:createTextBox(line.vertical_split:partition(i),"")
             line.text_box.text = 1
@@ -90,6 +112,14 @@ function SortList:fillMax()
     end
 end
 
+function SortList:fillInventory()
+    self._inventory:clear()
+    for k, v in ipairs(self._turrets) do
+        if self.inventory_limit and k >= self.inventory_limit then return end
+        self._inventory:add(v.InventoryReference)
+    end
+end
+
 function SortList:search()
     self._inventory.sortMode = 0
     for _, turret in pairs(self._turrets) do -- fill turret sum
@@ -113,17 +143,13 @@ function SortList:search()
     end
 
     table.sort(self._turrets, function(a,b) return a.sum > b.sum end)
-
-    self._inventory:clear()
-    for _, v in ipairs(self._turrets) do
-        self._inventory:add(v.InventoryReference)
-    end
+    self:fillInventory()
 end
 
 function SortList:clear()
     for _, line in pairs(self._lines) do
         line.checkbox.checked = false
-        line.text_box.text = 0
+        line.text_box.text = 1
     end
 end
 
@@ -209,10 +235,24 @@ function SortList:onShowWindow(index, type) -- Function specifically for invento
     self:updateInfo()
 end
 
+function SortList:show()
+    self._scrollframe:show()
+    self._searchbutton:show()
+    self._clearbutton:show()
+    self._buttonframe:show()
+end
+
+function SortList:hide()
+    self._scrollframe:hide()
+    self._searchbutton:hide()
+    self._clearbutton:hide()
+    self._buttonframe:hide()
+end
+
 function SortList:initialize()
     -- TODO write code to handle rects that arent lower 0,0 (upper is the bottom right)
     self._container = self._parent:createContainer(self._rect)
-    self._ahsplitter = UIArbitraryHorizontalSplitter(self._rect, 10, 0, --[[self._rect.height - self._rect.width/6*2,]] self._rect.height - self._rect.width/6)
+    self._ahsplitter = UIArbitraryHorizontalSplitter(Rect(self._rect.size), 10, 0, --[[self._rect.height - self._rect.width/6*2,]] self._rect.height - self._rect.width/6)
 
     self._scrollframe = self._container:createScrollFrame(self._ahsplitter:partition(0))
     self._lister = UIVerticalLister(Rect(vec2(),self._ahsplitter:partition(0).size+vec2(-15,0)),10,10)
@@ -235,7 +275,7 @@ function SortList:initialize()
     end
     ]]
 
-    self._container:createFrame(self._ahsplitter:partition(1)) -- change partition if trash
+    self._buttonframe = self._container:createFrame(self._ahsplitter:partition(1)) -- change partition if trash
     self._hsplit = UIVerticalSplitter(self._ahsplitter:partition(1), 5, 5, 0.5) -- change partition if trash
     self._searchbutton = self._container:createButton(self._hsplit.left, "Search", "SortList_onInvSearch")
     self._clearbutton = self._container:createButton(self._hsplit.right, "Clear", "SortList_onInvClear")
@@ -258,8 +298,8 @@ end
 ---@param parent UIElement
 ---@param rect Rect
 ---@param inventory Inventory
-function UISortList(namespace, parent, rect, inventory)
-    local x = {_namespace = namespace, _parent = parent, _rect = rect, _inventory = inventory}
+function UISortList(namespace, parent, rect, inventory, is_turrets)
+    local x = {_namespace = namespace, _parent = parent, _rect = rect, _inventory = inventory, _is_turrets = is_turrets}
     setmetatable(x, {__index = SortList})
     x:initialize()
     table.insert(SortList.elements, x)

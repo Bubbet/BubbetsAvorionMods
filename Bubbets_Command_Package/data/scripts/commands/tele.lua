@@ -20,7 +20,7 @@ function execute(sender, _, ...)
     player:setValue("commands_back_pos_y", sy)
 
     -- TODO fails on sector generation and would need to be called again after the sector has been generated(test for generated? and fail if not)
-    Galaxy():invokeFunction('data/scripts/galaxy/galaxycommandhelperfunctions.lua', 'moveEntity', player, x, y)
+    player:invokeFunction('data/scripts/player/playercommandhelperfunctions.lua', 'moveEntity', player, x, y)
 
     return 1, "", "Teleporting " .. player.name .. " to (" .. x .. ":" .. y .. ")"
 end

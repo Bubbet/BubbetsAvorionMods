@@ -1,5 +1,4 @@
-TurretConstructor = {} -- Default TurretConstructor object, do not touch unless you really know what you're doing. It will change every turret that hasn't overwrote these functions.
-TurretConstructor.Specialties = { -- You might want to modify this if you've got lots of weapons that will be using a new specialty as every turret will try to index it
+Specialties = { -- You might want to modify this if you've got lots of weapons that will be using a new specialty as every turret will try to index it
 	HighDamage = function(self)
 		local maxIncrease = 1.2
 		local increase = 0.3 + self.rand:getFloat(0, self.rarity.value / HighestRarity().value) * maxIncrease
@@ -9,7 +8,7 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		end
 
 		local addition = math.floor(increase * 100 + 0.00001) -- TODO rounding
-		self.turret:addDescription("%s%% Damage"%_T, string.format("%+i", addition))
+		self.descriptions["Damage"] = {priority = 0, str = "%s%% Damage"%_T, value = string.format("%+i", addition)}
 	end,
 	HighRange = function(self)
 		local maxIncrease = 0.3
@@ -20,14 +19,10 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		end
 
 		local addition = math.floor(increase * 100)
-		self.turret:addDescription("%s%% Range"%_T, string.format("%+i", addition))
+		self.descriptions["Range"] = {priority = 2, str = "%s%% Range"%_T, value = string.format("%+i", addition)}
 	end,
 	HighFireRate = function(self) end,
 	BurstFireEnergy = function(self)
-		for _, weapon in pairs(self.weapons) do
-			self.turret:addWeapon(weapon)
-		end
-
 		local fireRate = self.turret.fireRate
 		local fireDelay = 1 / fireRate
 
@@ -38,20 +33,11 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 			weapon.fireRate = fireRate / #self.weapons
 		end
 
-		self.turret:clearWeapons()
-		for _, weapon in pairs(self.weapons) do
-			self.turret:addWeapon(weapon)
-		end
+		self:reAddWeapons()
 
 		TurretGenerator.createBatteryChargeCooling(self.turret, fireRate * fireDelay, 1)
-
-		self.turret:clearWeapons()
 	end,
 	BurstFire = function(self)
-		for _, weapon in pairs(self.weapons) do
-			self.turret:addWeapon(weapon)
-		end
-
 		local fireRate = self.turret.fireRate
 		local fireDelay = 1 / fireRate
 
@@ -65,14 +51,9 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 			weapon.damage = weapon.damage * coolingTime
 		end
 
-		self.turret:clearWeapons()
-		for _, weapon in pairs(self.weapons) do
-			self.turret:addWeapon(weapon)
-		end
+		self:reAddWeapons()
 
 		TurretGenerator.createStandardCooling(self.turret, coolingTime, 1)
-
-		self.turret:clearWeapons()
 	end,
 	AutomaticFire = function(self)
 		if not self.turret.coaxial then
@@ -116,7 +97,7 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		end
 
 		local addition = math.floor(increase * 100)
-		self.turret:addDescription("%s%% Efficiency"%_T, string.format("%+i", addition))
+		self.descriptions["Efficiency"] = {priority = 3, str = "%s%% Efficiency"%_T, value = string.format("%+i", addition)}
 	end, -- only applicable to salvage and mining laser
 	HighShootingTime = function(self)
 		local maxIncrease = 2.9
@@ -125,7 +106,7 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		TurretGenerator.createStandardCooling(self.turret, self.turret.coolingTime, self.turret.shootingTime * (1 + increase))
 
 		local percentage = math.floor(increase * 100)
-		self.turret:addDescription("%s%% Shooting Until Overheated"%_T, string.format("%+i", percentage))
+		self.descriptions["ShootUntilOverheated"] = {priority = 4, str = "%s%% Shooting Until Overheated"%_T, value = string.format("%+i", percentage)}
 	end,
 	LessEnergyConsumption = function(self)
 		local maxDecrease = 0.6
@@ -134,7 +115,7 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		TurretGenerator.createBatteryChargeCooling(self.turret, self.turret.coolingTime * (1 - decrease), self.turret.shootingTime)
 
 		local percentage = math.floor(decrease * 100)
-		self.turret:addDescription("%s%% Less Energy Consumption"%_T, string.format("%+i", percentage))
+		self.descriptions["LessEnergy"] = {priority = 5, str = "%s%% Less Energy Consumption"%_T, value = string.format("%+i", percentage)}
 	end,
 	IonizedProjectile = function(self)
 		local chance = self.rand:getFloat(0.7, 0.8)
@@ -146,8 +127,8 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		end
 
 		local percentage = math.floor(chance * 100 + 0.0000001) -- TODO rounding
-		self.turret:addDescription("Ionized Projectiles"%_T, "")
-		self.turret:addDescription("%s%% Chance of penetrating shields"%_T, string.format("%i", percentage))
+		self.descriptions["IonizedProjectiles"] = {priority = 6, str = "Ionized Projectiles"%_T}
+		self.descriptions["ShieldPen"] = {priority = 6.1, str = "%s%% Chance of penetrating shields"%_T, value = string.format("%+i", percentage)}
 	end,
 	Penetration = function(self) end,
 	Explosive = function(self) end, -- AOE damage
@@ -155,35 +136,57 @@ TurretConstructor.Specialties = { -- You might want to modify this if you've got
 		self.turret.simultaneousShooting = true
 	end,
 }
-function TurretConstructor:getCrew()
-	local requiredCrew = self.crewAmount or TurretGenerator.dpsToRequiredCrew(self.dps)
-	local crew = Crew()
-	crew:add(requiredCrew, CrewMan(self.crewType or CrewProfessionType.Gunner))
-	return crew
+
+--TODO split each turret into its own file like the upgrade generator does
+TurretConstructor = {}
+
+--region Base Turret
+TurretConstructor.baseTurret = {}
+
+-- Define crewAmount, crewType to use it instead.
+function TurretConstructor.baseTurret:addCrew()
+	self.crew = Crew()
+	self.crew:add(self.crewAmount or TurretGenerator.dpsToRequiredCrew(self.dps), CrewMan(self.crewType or CrewProfessionType.Gunner))
+	self.turret.crew = self.crew
 end
-function TurretConstructor:getWeapon()
-	return WeaponGenerator.generateWeapon(self.rand, self.type, self.dps, self.tech, self.material, self.rarity) -- Replace this later?
-end
-function TurretConstructor:getNumWeapons()
+
+function TurretConstructor.baseTurret:getNumWeapons()
 	return {1, 2, 4}
 end
-function TurretConstructor:getWeapons()
+
+function TurretConstructor.baseTurret:getWeapon()
+	return WeaponGenerator.generateWeapon(self.rand, self.type, self.dps, self.tech, self.material, self.rarity) -- Replace this later?
+end
+
+function TurretConstructor.baseTurret:generateWeapons()
 	local weapons = self:getNumWeapons()
 	local numWeapons = weapons[self.rand:getInt(1, #weapons)]
 	local weapon = self:getWeapon()
 	weapon.fireDelay = weapon.fireDelay * numWeapons
-	weapons = {}
+	self.weapons = {}
 	for _ = 1, numWeapons do
-		table.insert(weapons, weapon)
+		table.insert(self.weapons, weapon)
 	end
-	return weapons
 end
-function TurretConstructor:applyCooling()
-	--local shootingTime = 7 * self.rand:getFloat(0.9, 1.3)
-	--local coolingTime = 5 * self.rand:getFloat(0.8, 1.2)
-	--TurretGenerator.createStandardCooling(self.turret, coolingTime, shootingTime)
+
+function TurretConstructor.baseTurret:reAddWeapons()
+	self.turret:clearWeapons()
+	for _, weapon in pairs(self.weapons) do
+		self.turret:addWeapon(weapon)
+	end
 end
-function TurretConstructor:getWeaponScaleTable()
+
+function TurretConstructor.baseTurret:attachWeapons()
+	self.turret:clearWeapons()
+	local places = {TurretGenerator.createWeaponPlaces(self.rand, #self.weapons)}
+	for k, v in pairs(self.weapons) do
+		v.localPosition = places[k] * self.turret.size -- * self.turret.size --* self.scale.size or 1 causes really disjointed turrets
+		--v.localPosition = v.localPosition * self.scale.size
+		self.turret:addWeapon(v)
+	end
+end
+
+function TurretConstructor.baseTurret:getWeaponScaleTable()
 	return scales[self.type] or {
 		{from = 0, to = 18, size = 0.5, usedSlots = 1},
 		{from = 19, to = 33, size = 1.0, usedSlots = 2},
@@ -191,223 +194,248 @@ function TurretConstructor:getWeaponScaleTable()
 		{from = 46, to = 52, size = 2.0, usedSlots = 4},
 	}
 end
-function TurretConstructor:getScale()
+
+function TurretConstructor.baseTurret:getTurningSpeed()
+	return lerp(self.turret.size, 0.5, 3, 1, 0.3) * self.rand:getFloat(0.8, 1.2) * (self.turnSpeedFactor or 1)
+end
+
+function TurretConstructor.baseTurret:generateScale()
+	local size, usedSlots = 1, 1
+
 	local scaleTech = self.tech
 	if self.rand:test(0.5) then
 		scaleTech = math.floor(math.max(1, scaleTech * self.rand:getFloat(0, 1)))
 	end
 
-	local scale = {from = 0, to = 0, size = 1, usedSlots = 1}
-	for _, _scale in pairs(self:getWeaponScaleTable()) do
-		if self.tech >= _scale.from and self.tech <= _scale.to then scale = _scale end
+	for _, scale in pairs(self:getWeaponScaleTable()) do
+		if scaleTech >= scale.from and scaleTech <= scale.to then
+			size = scale.size
+			usedSlots = scale.usedSlots
+		end
 	end
 
-	scale.coaxial = (scale.usedSlots >= 5)
-	scale.turningSpeed = lerp(scale.size, 0.5, 3, 1, 0.3) * self.rand:getFloat(0.8, 1.2) * (self.turnSpeedFactor or 1)
-	scale.coaxialDamageScale = self.turret.coaxial and 3 or 1
-	scale.shotSizeFactor = scale.size * 2
+	self.turret.coaxial = (usedSlots >= 5) and (self.rand:test(0.25) or not self.coaxialImpossible) -- replaces coaxialPossible being the inverse, its easier to write this way
 
-	scale.reachFactor = (1 + (scale.usedSlots - 1) * 0.15)
-
-	return scale
+	self.turret.size = size
+	self.turret.slots = usedSlots
+	self.turret.turningSpeed = self:getTurningSpeed()
 end
-function TurretConstructor:applyWeaponScale()
+
+function TurretConstructor.baseTurret:getReachFactor()
+	return (self.turret.slots - 1) * 0.15
+end
+
+function TurretConstructor.baseTurret:getShotSizeFactor()
+	return self.turret.size * 2
+end
+
+function TurretConstructor.baseTurret:scaleWeapons()
 	for _, weapon in pairs(self.weapons) do
-		if self.scale.usedSlots > 1 then
-			-- scale damage, etc. linearly with amount of used slots
-			weapon.damage = weapon.damage * self.scale.usedSlots * self.scale.coaxialDamageScale
-			weapon.reach = weapon.reach * self.scale.reachFactor
-			if weapon.isProjectile then weapon.psize = weapon.psize * self.scale.shotSizeFactor end
-			if weapon.isBeam then weapon.bwidth = weapon.bwidth * self.scale.shotSizeFactor end
+		if self.turret.slots > 1 then
+			self.coaxialScale = (self.turret.coaxial and (self.coaxialDamageScale or 3) or 1) -- for use in hullRepair, shieldRepair etc
+			weapon.damage = weapon.damage * self.turret.slots * self.coaxialScale
+			weapon.reach = weapon.reach * self:getReachFactor()
+			if weapon.isProjectile then weapon.psize = weapon.psize * self:getShotSizeFactor() end
+			if weapon.isBeam then weapon.bwidth = weapon.bwidth * self:getShotSizeFactor() end
 		end
 	end
 end
-function TurretConstructor:applyScale()
-	local scale = self:getScale()
-	self.scale = scale -- Needed inside applyWeaponScale and applyWeapons
-	self.turret.size = scale.size
-	self.turret.coaxial = scale.coaxial
-	self.turret.slots = scale.usedSlots
-	self.turret.turningSpeed = scale.turningSpeed
-	self:applyWeaponScale()
+
+function TurretConstructor.baseTurret:getPossibleSpecialties()
+	return possibleSpecialties[self.type] -- Ideally the possibleSpecialties would have its entry here instead
 end
-function TurretConstructor:getSpecialtiesTable()
+
+function SpecialtyKeyFromValue(value)
+	for k, v in pairs(Specialty) do
+		if v == value then return k end
+	end
+end
+
+function TurretConstructor.baseTurret:getSpecialtiesTable() -- You can overload this function to change how specialties act for a weapon
 	local tab = {}
-	for _, v in pairs(possibleSpecialties[self.type]) do
-		for k1, v1 in pairs(Specialty) do
-			if v.specialty == v1 then
-				table.insert(tab, {specialty = k1, probability = v.probability})
-			end
-		end
+	for _, v in pairs(self:getPossibleSpecialties()) do
+		local key = SpecialtyKeyFromValue(v.specialty)
+		table.insert(tab, {name = key, func = Specialties[key], probability = v.probability})
 	end
 	return tab
 end
-function TurretConstructor:getGuaranteedSpecialtiesTable()
-	return {}
-end
-function TurretConstructor:getSpecialties()
-	local probabilities = self:getSpecialtiesTable()
+
+function TurretConstructor.baseTurret:getSpecialties()
 	local specialties = {}
-	for _, v in pairs(probabilities) do
-		if not ( self.turret.coaxial and v.specialty == 'AutomaticFire' ) then
+
+	local simultaneousShooting
+	for _, v in pairs(self:getSpecialtiesTable()) do
+		if v.name == 'SimultaneousShooting' then
+			simultaneousShooting = v.func
+		end
+		if not ( self.turret.coaxial and v.name == 'AutomaticFire' ) then
 			if self.rand:test(v.probability * (self.rarity.value + 0.2)) then
-				table.insert(specialties, v.specialty)
+				table.insert(specialties, v.func)
 			end
 		end
 	end
+
 	local maxNumSpecialties = self.rand:getInt(0, 1 + math.modf(self.rarity.value / 2)) -- round to zero
+
 	for _=1, math.max(0, maxNumSpecialties - #specialties) do
 		table.remove(specialties, self.rand:getInt(1, #specialties))
 	end
-	for _, v in pairs(self:getGuaranteedSpecialtiesTable()) do
-		table.insert(specialties, v)
+
+	if self.getGuaranteedSpecialtiesTable then
+		for _, v in pairs(self:getGuaranteedSpecialtiesTable()) do
+			table.insert(specialties, v)
+		end
 	end
-	if self.simultaneousShootingProbability and self.rand:test(self.simultaneousShootingProbability) then
-		table.insert(specialties, 'SimultaneousShooting')
+
+	if simultaneousShooting and self.simultaneousShootingProbability and self.rand:test(self.simultaneousShootingProbability) then
+		table.insert(specialties, simultaneousShooting)
 	end
+
 	return specialties
 end
-function TurretConstructor:applySpecialties()
-	local specialties = self:getSpecialties()
-	for _, v in pairs(specialties) do
-		self.Specialties[v](self)
-	end
-end
-function TurretConstructor:applyWeapons()
-	local places = {TurretGenerator.createWeaponPlaces(self.rand, #self.weapons)}
-	for k, v in pairs(self.weapons) do
-		v.localPosition = places[k] * self.turret.size --* self.scale.size or 1 causes really disjointed turrets
-		self.turret:addWeapon(v)
-	end
-end
-function TurretConstructor:extraDescriptions() end
 
----@class TurretConstructor
----@return TurretTemplate
----@param rand Random
----@param dps number
----@param tech number
----@param material Material
----@param rarity Rarity
----@param _type string
-function TurretConstructor:new(rand, dps, tech, material, rarity, _type)
-	self.rand, self.type, self.dps, self.tech, self.material, self.rarity = rand, _type, dps, tech, material, rarity  -- setting base values of table
-	self.turret = TurretTemplate()
-	self.turret.crew = self:getCrew()
-	self.weapons = self:getWeapons()
-	self:applyScale() -- before attaching to prevent getting, removing, then re-adding turrets
-	self:applyCooling()
-	self:applySpecialties() -- before attaching to prevent getting, removing, then re-adding turrets
-	self:applyWeapons()
-	self:extraDescriptions()
+function TurretConstructor.baseTurret:addSpecialities()
 	self.turret:updateStaticStats()
-	setmetatable(self.Specialties, {__index = TurretConstructor.Specialties}) -- Probably needed to overwrite values in the specialties table
+
+	self.descriptions = {}
+
+	for _, v in pairs(self:getSpecialties()) do
+		v(self)
+	end
+
+	self:reAddWeapons()
+
+	local sortedDescriptions = {}
+	for _, desc in pairs(self.descriptions) do
+		table.insert(sortedDescriptions, desc)
+	end
+
+	table.sort(sortedDescriptions, function(a, b) return a.priority < b.priority end)
+
+	for _, desc in pairs(sortedDescriptions) do
+		self.turret:addDescription(desc.str or "", desc.value or "")
+	end
+end
+
+function TurretConstructor.baseTurret:build(_type, rand, dps, tech, material, rarity)
+	self.type = _type
+	self.rand = rand
+	self.dps = dps
+	self.tech = tech
+	self.material = material
+	self.rarity = rarity
+	self.turret = TurretTemplate()
+	self:addCrew()
+	self:generateWeapons()
+	self:generateScale()
+	self:scaleWeapons()
+	self:attachWeapons()
+	if self.applyCooling then self:applyCooling() end
+	if self.extraDescriptions then self:extraDescriptions() end
+	self:addSpecialities()
+	self.turret:updateStaticStats()
 	return self.turret
 end
 
-function TurretGenerator.populateGeneratorFunction() -- In its own function so it can be overwrote before runtime you should probably avoid doing that though
-	for _, v in pairs(WeaponType) do
-		generatorFunction[v] = setmetatable({}, {__call = TurretConstructor.new, __index = TurretConstructor}) -- function(rand, dps, tech, material, rarity) end
+--endregion
+
+function function_from_object(_type, object)
+	if not _type or not object then return end
+	generatorFunction[_type] = function(rand, dps, tech, material, rarity)
+		setmetatable(object, {__index = TurretConstructor.baseTurret})
+		return object:build(_type, rand, dps, tech, material, rarity)
 	end
 end
-TurretGenerator.populateGeneratorFunction()
 
----@return TurretTemplate
----@param rand Random
----@param dps number
----@param tech number
----@param material Material
----@param rarity Rarity
----@param _type string
-function TurretGenerator.generateTurret(rand, _type, dps, tech, material, rarity)
-	if rarity == nil then
-		local index = rand:getValueOfDistribution(32, 32, 16, 8, 4, 1)
-		rarity = Rarity(index - 1)
-	end
-	return generatorFunction[_type](rand, dps, tech, material, rarity, _type)
-end
-
----@param weaponType string
----@param tab table
-function TurretGenerator.replaceFunctions(weaponType, tab)
-	for k, v in pairs(tab) do
-		generatorFunction[weaponType][k] = v
+function get_specialty_by_name(name)
+	for k, v in pairs(Specialties) do
+		if k == name then
+			return v
+		end
 	end
 end
---[[
-TurretGenerator.replaceFunctions(WeaponType.ChainGun, { -- Example 1
-	getCrew = function(self)
-		local oldcrew = TurretConstructor.getCrew(self)
-		oldcrew:add(1, CrewMan(CrewProfessionType.Miner))
-		return oldcrew
-	end,
-})
 
-generatorFunction[WeaponType.ChainGun].getCrew = function(self)  -- Example 2
-	local oldcrew = TurretConstructor.getCrew(self)
-	oldcrew:add(1, CrewMan(CrewProfessionType.Miner))
-	return oldcrew
-end
-]]
-
-TurretGenerator.replaceFunctions(WeaponType.ChainGun,{
-	getNumWeapons = function(self) return {self.rand:getInt(1,3)} end,
+--region Vanilla Guns
+TurretConstructor.ChainGun = {
 	simultaneousShootingProbability = 0.25,
-	turnSpeedFactor = 1.2,
-})
-TurretGenerator.replaceFunctions(WeaponType.PointDefenseChainGun,{
-	getNumWeapons = function(self) return {self.rand:getInt(2,3)} end,
-	getGuaranteedSpecialtiesTable = function(self) return {'AutomaticFire'} end,
-	turnSpeedFactor = 2,
-})
-TurretGenerator.replaceFunctions(WeaponType.PointDefenseLaser,{
-	getNumWeapons = function(self) return {1} end,
-	getGuaranteedSpecialtiesTable = function(self) return {'AutomaticFire'} end,
-	turnSpeedFactor = 2,
-})
-TurretGenerator.replaceFunctions(WeaponType.Laser, {
-	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
-	applyCooling = function(self)
-		local rechargeTime = 30 * self.rand:getFloat(0.8, 1.2)
-		local shootingTime = 20 * self.rand:getFloat(0.8, 1.2)
-		TurretGenerator.createBatteryChargeCooling(self.turret, rechargeTime, shootingTime)
-	end,
-})
-TurretGenerator.replaceFunctions(WeaponType.MiningLaser,{
-	crewType = CrewProfessionType.Miner,
-	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
-	extraDescriptions = function(self)
-		local percentage = math.floor(self.weapons[1].stoneDamageMultiplier * 100)
-		self.turret:addDescription("%s%% Damage to Stone"%_T, string.format("%+i", percentage))
-	end,
-})
-TurretGenerator.replaceFunctions(WeaponType.RawMiningLaser,{
-	crewType = CrewProfessionType.Miner,
-	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
-	extraDescriptions = function(self)
-		local percentage = math.floor(self.weapons[1].stoneDamageMultiplier * 100)
-		self.turret:addDescription("%s%% Damage to Stone"%_T, string.format("%+i", percentage))
-	end,
-})
-TurretGenerator.replaceFunctions(WeaponType.SalvagingLaser,{
-	crewType = CrewProfessionType.Miner,
-	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
-})
-TurretGenerator.replaceFunctions(WeaponType.RawSalvagingLaser,{
-	crewType = CrewProfessionType.Miner,
-	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
-})
-TurretGenerator.replaceFunctions(WeaponType.PlasmaGun,{
+	turnSpeedFactor = 1.2
+}
+function TurretConstructor.ChainGun:getNumWeapons() return {self.rand:getInt(1,3)} end
+function_from_object(WeaponType.ChainGun, TurretConstructor.ChainGun)
+
+TurretConstructor.PointDefenseChainGun = {
+	turnSpeedFactor = 2
+}
+function TurretConstructor.PointDefenseChainGun:getNumWeapons() return {self.rand:getInt(2,3)} end
+function TurretConstructor.PointDefenseChainGun:getGuaranteedSpecialtiesTable()
+	return {get_specialty_by_name('AutomaticFire')}
+end
+function_from_object(WeaponType.PointDefenseChainGun, TurretConstructor.PointDefenseChainGun)
+
+TurretConstructor.PointDefenseLaser = {
+	turnSpeedFactor = 2
+}
+function TurretConstructor.PointDefenseLaser:getNumWeapons() return {1} end
+function TurretConstructor.PointDefenseLaser:getGuaranteedSpecialtiesTable()
+	return {get_specialty_by_name('AutomaticFire')}
+end
+function_from_object(WeaponType.PointDefenseLaser, TurretConstructor.PointDefenseLaser)
+
+TurretConstructor.Laser = {}
+function TurretConstructor.Laser:getNumWeapons() return {self.rand:getInt(1,2)} end
+function TurretConstructor.Laser:applyCooling()
+	local rechargeTime = 30 * self.rand:getFloat(0.8, 1.2)
+	local shootingTime = 20 * self.rand:getFloat(0.8, 1.2)
+	TurretGenerator.createBatteryChargeCooling(self.turret, rechargeTime, shootingTime)
+end
+function_from_object(WeaponType.Laser, TurretConstructor.Laser)
+
+TurretConstructor.MiningLaser = {
+	crewType = CrewProfessionType.Miner
+}
+function TurretConstructor.MiningLaser:getNumWeapons() return {self.rand:getInt(1, 2)} end
+function TurretConstructor.MiningLaser:extraDescriptions()
+	local percentage = math.floor(self.weapons[1].stoneDamageMultiplier * 100)
+	self.turret:addDescription("%s%% Damage to Stone"%_T, string.format("%+i", percentage))
+end
+function_from_object(WeaponType.MiningLaser, TurretConstructor.MiningLaser)
+
+TurretConstructor.RawMiningLaser = {
+	crewType = CrewProfessionType.Miner
+}
+function TurretConstructor.RawMiningLaser:getNumWeapons() return {self.rand:getInt(1, 2)} end
+function TurretConstructor.RawMiningLaser:extraDescriptions()
+	local percentage = math.floor(self.weapons[1].stoneDamageMultiplier * 100)
+	self.turret:addDescription("%s%% Damage to Stone"%_T, string.format("%+i", percentage))
+end
+function_from_object(WeaponType.RawMiningLaser, TurretConstructor.RawMiningLaser)
+
+TurretConstructor.SalvagingLaser = {
+	crewType = CrewProfessionType.Miner
+}
+function TurretConstructor.SalvagingLaser:getNumWeapons() return {self.rand:getInt(1, 2)} end
+function_from_object(WeaponType.SalvagingLaser, TurretConstructor.SalvagingLaser)
+
+TurretConstructor.RawSalvagingLaser = {
+	crewType = CrewProfessionType.Miner
+}
+function TurretConstructor.RawSalvagingLaser:getNumWeapons() return {self.rand:getInt(1, 2)} end
+function_from_object(WeaponType.RawSalvagingLaser, TurretConstructor.RawSalvagingLaser)
+
+-- A different way of doing the same thing from here on:
+TurretConstructor.PlasmaGun = {
+	simultaneousShootingProbability = 0.25,
+	turnSpeedFactor = 0.9,
 	getNumWeapons = function(self) return {self.rand:getInt(1, 4)} end,
 	applyCooling = function(self)
 		local rechargeTime = 20 * self.rand:getFloat(0.8, 1.2)
 		local shootingTime = 15 * self.rand:getFloat(0.8, 1.2)
 		TurretGenerator.createBatteryChargeCooling(self.turret, rechargeTime, shootingTime)
-	end,
-	simultaneousShootingProbability = 0.25,
-	turnSpeedFactor = 0.9,
-})
-TurretGenerator.replaceFunctions(WeaponType.RocketLauncher,{
+	end
+}
+function_from_object(WeaponType.PlasmaGun, TurretConstructor.PlasmaGun)
+
+TurretConstructor.RocketLauncher = {
 	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
 	applyWeapons = function(self)
 		local positions = {}
@@ -424,7 +452,9 @@ TurretGenerator.replaceFunctions(WeaponType.RocketLauncher,{
 			self.turret:addWeapon(self.weapons[1])
 		end
 	end,
-	getGuaranteedSpecialtiesTable = function(self) return {'Explosive'} end,
+	getGuaranteedSpecialtiesTable = function(self)
+		return {get_specialty_by_name('Explosive')}
+	end,
 	applyCooling = function(self)
 		local shootingTime = 20 * self.rand:getFloat(0.8, 1.2)
 		local coolingTime = 15 * self.rand:getFloat(0.8, 1.2)
@@ -432,8 +462,10 @@ TurretGenerator.replaceFunctions(WeaponType.RocketLauncher,{
 	end,
 	simultaneousShootingProbability = 0.5,
 	turnSpeedFactor = 0.6,
-})
-TurretGenerator.replaceFunctions(WeaponType.Cannon,{
+}
+function_from_object(WeaponType.RocketLauncher, TurretConstructor.RocketLauncher)
+
+TurretConstructor.Cannon = {
 	getNumWeapons = function(self) return {self.rand:getInt(1, 4)} end,
 	applyCooling = function(self)
 		local shootingTime = 25 * self.rand:getFloat(0.8, 1.2)
@@ -442,10 +474,12 @@ TurretGenerator.replaceFunctions(WeaponType.Cannon,{
 	end,
 	simultaneousShootingProbability = 0.5,
 	turnSpeedFactor = 0.6,
-})
-TurretGenerator.replaceFunctions(WeaponType.RailGun,{
+}
+function_from_object(WeaponType.Cannon, TurretConstructor.Cannon)
+
+TurretConstructor.RailGun = {
 	getNumWeapons = function(self) return {self.rand:getInt(1, 3)} end,
-	getGuaranteedSpecialtiesTable = function(self) return {'Penetration'} end,
+	getGuaranteedSpecialtiesTable = function(self) return {get_specialty_by_name('Penetration')} end,
 	applyCooling = function(self)
 		local shootingTime = 27.5 * self.rand:getFloat(0.8, 1.2)
 		local coolingTime = 10 * self.rand:getFloat(0.8, 1.2)
@@ -453,15 +487,17 @@ TurretGenerator.replaceFunctions(WeaponType.RailGun,{
 	end,
 	simultaneousShootingProbability = 0.25,
 	turnSpeedFactor = 0.75,
-})
-TurretGenerator.replaceFunctions(WeaponType.RepairBeam,{
+}
+function_from_object(WeaponType.RailGun, TurretConstructor.RailGun)
+
+TurretConstructor.RepairBeam = {
 	crewType = CrewProfessionType.Repair,
 	applyCooling = function(self)
 		local rechargeTime = 15 * self.rand:getFloat(0.8, 1.2)
 		local shootingTime = 10 * self.rand:getFloat(0.8, 1.2)
 		TurretGenerator.createBatteryChargeCooling(self.turret, rechargeTime, shootingTime)
 	end,
-	applyWeapons = function(self)
+	attachWeapons = function(self)
 		if self.rand:test(0.125) == true then
 			local weapon = self:getWeapon()
 			weapon.localPosition = vec3(0.1, 0, 0) --* self.scale.size
@@ -495,11 +531,13 @@ TurretGenerator.replaceFunctions(WeaponType.RepairBeam,{
 
 		else
 			-- just attach normally
-			TurretConstructor.applyWeapons(self)
+			TurretConstructor.baseTurret.attachWeapons(self)
 		end
 	end,
-})
-TurretGenerator.replaceFunctions(WeaponType.Bolter,{
+}
+function_from_object(WeaponType.RepairBeam, TurretConstructor.RepairBeam)
+
+TurretConstructor.Bolter = {
 	applyCooling = function(self)
 		local shootingTime = 7 * self.rand:getFloat(0.9, 1.3)
 		local coolingTime = 5 * self.rand:getFloat(0.8, 1.2)
@@ -507,8 +545,10 @@ TurretGenerator.replaceFunctions(WeaponType.Bolter,{
 	end,
 	getNumWeapons = function(self) return {1, 2, 4} end,
 	turnSpeedFactor = 0.9,
-})
-TurretGenerator.replaceFunctions(WeaponType.LightningGun,{
+}
+function_from_object(WeaponType.Bolter, TurretConstructor.Bolter)
+
+TurretConstructor.LightningGun = {
 	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
 	applyCooling = function(self)
 		local rechargeTime = 20 * self.rand:getFloat(0.8, 1.2)
@@ -517,8 +557,10 @@ TurretGenerator.replaceFunctions(WeaponType.LightningGun,{
 	end,
 	simultaneousShootingProbability = 0.15,
 	turnSpeedFactor = 0.75,
-})
-TurretGenerator.replaceFunctions(WeaponType.TeslaGun,{
+}
+function_from_object(WeaponType.LightningGun, TurretConstructor.LightningGun)
+
+TurretConstructor.TeslaGun = {
 	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
 	applyCooling = function(self)
 		local rechargeTime = 20 * self.rand:getFloat(0.8, 1.2)
@@ -527,8 +569,10 @@ TurretGenerator.replaceFunctions(WeaponType.TeslaGun,{
 	end,
 	simultaneousShootingProbability = 0.15,
 	turnSpeedFactor = 1.2,
-})
-TurretGenerator.replaceFunctions(WeaponType.ForceGun,{
+}
+function_from_object(WeaponType.TeslaGun, TurretConstructor.TeslaGun)
+
+TurretConstructor.ForceGun = {
 	getCrew = function(self)
 		local requiredCrew = math.floor(1 + math.sqrt(self.dps / 2000))
 		local crew = Crew()
@@ -536,8 +580,9 @@ TurretGenerator.replaceFunctions(WeaponType.ForceGun,{
 		return crew
 	end,
 	getNumWeapons = function(self) return {self.rand:getInt(1, 2)} end,
-	getWeapons = function(self) -- Might result in offset beams, overwrite applyWeapons if so
-		local weapons = TurretConstructor.getWeapons(self)
+	generateWeapons = function(self) -- Might result in offset beams, overwrite applyWeapons if so
+		TurretConstructor.baseTurret.generateWeapons(self)
+		local weapons = self.weapons
 		local empty = self:getWeapon()
 		empty.selfForce = 0
 		empty.otherForce = 0
@@ -559,8 +604,10 @@ TurretGenerator.replaceFunctions(WeaponType.ForceGun,{
 		local shootingTime = rechargeTime * self.rand:getFloat(0.7, 0.9)
 		TurretGenerator.createBatteryChargeCooling(self.turret, rechargeTime, shootingTime)
 	end,
-})
-TurretGenerator.replaceFunctions(WeaponType.PulseCannon,{
+}
+function_from_object(WeaponType.ForceGun, TurretConstructor.ForceGun)
+
+TurretConstructor.PulseCannon = {
 	getNumWeapons = function(self) return {self.rand:getInt(1, 3)} end,
 	applyCooling = function(self)
 		local shootingTime = 15 * self.rand:getFloat(1, 1.5)
@@ -572,12 +619,16 @@ TurretGenerator.replaceFunctions(WeaponType.PulseCannon,{
 			weapon.damage = weapon.damage * ((coolingTime + shootingTime) / shootingTime)
 		end
 	end,
-	getGuaranteedSpecialtiesTable = function(self) return {'IonizedProjectile'} end,
+	getGuaranteedSpecialtiesTable = function(self) return {get_specialty_by_name('IonizedProjectile')} end,
 	simultaneousShootingProbability = 0.25,
 	turnSpeedFactor = 1.2,
-})
-TurretGenerator.replaceFunctions(WeaponType.AntiFighter,{
+}
+function_from_object(WeaponType.PulseCannon, TurretConstructor.PulseCannon)
+
+TurretConstructor.AntiFighter = {
 	getNumWeapons = function(self) return {self.rand:getInt(1,3)} end,
-	getGuaranteedSpecialtiesTable = function(self) return {'Explosive', 'AutomaticFire'} end,
+	getGuaranteedSpecialtiesTable = function(self) return {get_specialty_by_name('Explosive'), get_specialty_by_name('AutomaticFire')} end,
 	turnSpeedFactor = 1.2,
-})
+}
+function_from_object(WeaponType.AntiFighter, TurretConstructor.AntiFighter)
+--endregion

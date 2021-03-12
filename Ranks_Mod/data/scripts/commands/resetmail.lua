@@ -9,7 +9,7 @@ function execute(sender, _, ...)
 
   if rank then
     err, success = Galaxy():invokeFunction("data/scripts/galaxy/ranks.lua", "resetMail", rank)
-    if success then
+    if err then
       output = "Reset the " .. rank .. " mail deliver state."
     end
   end

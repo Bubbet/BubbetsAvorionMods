@@ -1,2 +1,1 @@
-GravyUINode.centeredrect = include('gravyui/plugins/centeredrect')
-
+include('gravyui/plugins/bubbetsuielements')

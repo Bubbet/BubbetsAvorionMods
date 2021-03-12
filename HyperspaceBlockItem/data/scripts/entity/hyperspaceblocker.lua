@@ -23,7 +23,9 @@ callable(HyperSpaceBlocker, 'delete')
 function HyperSpaceBlocker.getRange()
 	if not HyperSpaceBlocker.range then
 		local rarity = HyperSpaceBlocker.rarity.value
-		HyperSpaceBlocker.range = (200 + (rarity + 2) * 500 + math.random() * (rarity * 100))/2 -- these are the exact default values from rinarts mod
+		--(200 + (-1 + 2) * 500)*1.3
+		--(200 + (5 + 2) * 500 + 1 * (5 * 100))*1.3
+		HyperSpaceBlocker.range = (200 + (rarity + 2) * 500 + math.random() * (rarity * 100))*1.3 -- these are the exact default values from rinarts mod if it was 0.5 instead of 0.65
 		HyperSpaceBlocker.range = HyperSpaceBlocker.range^2 -- squaring for distance2
 	end
 	return HyperSpaceBlocker.range
@@ -75,12 +77,12 @@ function HyperSpaceBlocker.initialize(rarity, owner)
 		HyperSpaceBlocker.sector = Sector()
 		HyperSpaceBlocker.entity = Entity()
 
-		if not rarity then -- from a restore
-			HyperSpaceBlocker.delete()
-		end
-
 		HyperSpaceBlocker.rarity = rarity
 		HyperSpaceBlocker.owner = owner
+
+		if not HyperSpaceBlocker.rarity then -- from a restore
+			HyperSpaceBlocker.delete()
+		end
 
 		HyperSpaceBlocker.title = HyperSpaceBlocker.entity.title
 		HyperSpaceBlocker.timeToDie = HyperSpaceBlocker.getTimeToDie()

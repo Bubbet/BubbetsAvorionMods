@@ -5,9 +5,9 @@ function execute(sender, _, ...)
 
     local err, rank, player, id = Galaxy():invokeFunction("data/scripts/galaxy/ranks.lua", "findUser", "", args[1])
     local splayer = Player(sender)
-    local sid = splayer.id.id
+    local sid = splayer and splayer.id.id
     local err2, canpreform = Galaxy():invokeFunction("data/scripts/galaxy/ranks.lua", "hasPowerOverWithRank", sid, id, rank)
-    canpreform = canpreform or Server():hasAdminPrivileges(splayer) or not splayer
+    canpreform = canpreform or  not splayer or Server():hasAdminPrivileges(splayer)
 
     local output = "Failed to" .. (rank and "" or " find rank, ") .. (id and "" or " find id, ") .. (canpreform and "" or " pass permission check, ")
 
@@ -23,7 +23,7 @@ function execute(sender, _, ...)
         end
     end
 
-    return #success > 0, "", output
+    return success and (#success > 0), "", output
 end
 
 function getDescription()

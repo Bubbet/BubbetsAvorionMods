@@ -1,2 +1,0 @@
-Make sure you're able to find a line similar to this in their version of the upgradegenerator.lua
-"UpgradeGenerator.add("data/scripts/systems/systemscanner.lua",1)"

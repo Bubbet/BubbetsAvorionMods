@@ -13,7 +13,6 @@ function RepairDock.onShowWindow(option)
 
 end
 
-
 function RepairDock.reconstruct(shipName, allianceShip)
 
 	if not CheckFactionInteraction(callingPlayer, RepairDock.interactionThreshold) then return end
@@ -91,7 +90,9 @@ function RepairDock.reconstruct(shipName, allianceShip)
 	local docks = DockingPositions(station)
 	local dockIndex = docks:getFreeDock()
 	if dockIndex then
-		local pos, dir = docks:getDockingPosition(dockIndex)
+		local dock = docks:getDockingPosition(dockIndex)
+		local pos = vec3(dock.position.x, dock.position.y, dock.position.z)
+		local dir = vec3(dock.direction.x, dock.direction.y, dock.direction.z)
 
 		pos = station.position:transformCoord(pos)
 		dir = station.position:transformNormal(dir)
@@ -112,12 +113,13 @@ function RepairDock.reconstruct(shipName, allianceShip)
 
 
 	local craft = buyer:restoreCraft(shipName, position, true)
-	CargoBay(craft):clear()
-
 	if not craft then
 		player:sendChatMessage(Entity(), ChatMessageType.Error, "Error reconstructing craft."%_t)
 		return
 	end
+
+	CargoBay(craft):clear()
+	craft:setValue("untransferrable", nil) -- tutorial could have broken this
 
 	if ship.isDrone then
 		player.craft = craft
@@ -128,4 +130,87 @@ function RepairDock.reconstruct(shipName, allianceShip)
 	Sector():broadcastChatMessage(Entity(), ChatMessageType.Normal, "If you buy a new Reconstruction Token, we'll fix her up for free!"%_t)
 
 	invokeClientFunction(player, "onShowWindow", 0)
+end
+
+function RepairDock.refreshReconstructionTokens()
+
+	if RepairDock.isShipyardRepairDock() then
+		tabbedWindow:deactivateTab(tokensTab)
+		tokensTab.description = "Only available at Repair Docks, not Shipyards!"%_t
+		return
+	else
+		tabbedWindow:activateTab(tokensTab)
+		tokensTab.description = "Buy Reconstruction Tokens"%_t
+	end
+
+	local player = Player()
+	local buyer = Galaxy():getPlayerCraftFaction()
+	local ship = player.craft
+
+	reconstructionPriceLabel.caption = "Price: ¢${money}"%_t % {money = createMonetaryString(RepairDock.getReconstructionSiteChangePrice())}
+
+	if buyer.isAlliance then
+		setReconstructionSiteButton.active = false
+		setReconstructionSiteButton.tooltip = "Alliances don't have reconstruction sites."%_t
+	elseif RepairDock.isReconstructionSite() then
+		setReconstructionSiteButton.active = false
+		setReconstructionSiteButton.tooltip = "This sector is already your reconstruction site."%_t
+	else
+		setReconstructionSiteButton.active = true
+		setReconstructionSiteButton.tooltip = nil
+	end
+
+	local tokens = countReconstructionTokens(player, ship.name, buyer.index)
+	local atokens = 0
+
+	local alliance = player.alliance
+	if alliance then
+		atokens = countReconstructionTokens(alliance, ship.name, buyer.index)
+	end
+
+	local price = RepairDock.getReconstructionTokenPrice(buyer, ship)
+
+	if price and price > 0 then
+		buyTokenAmountLabel.caption = tostring(tokens)
+		buyTokenNameLabel.caption = ship.name
+		buyTokenPriceLabel.caption = createMonetaryString(price)
+
+		if atokens > 0 then
+			buyTokenButton.active = false
+			buyTokenButton.tooltip = "Your alliance already owns a Reconstruction Token for this ship."%_t
+			buyTokenAmountLabel.active = false
+		elseif tokens > 0 then
+			buyTokenButton.active = false
+			buyTokenButton.tooltip = "You already own a Reconstruction Token for this ship."%_t
+			buyTokenAmountLabel.active = false
+		else
+			buyTokenButton.active = true
+			buyTokenAmountLabel.active = true
+			buyTokenButton.tooltip = "Buy a token and get your ship repaired FOR FREE!"%_t
+		end
+
+		if buyer.isPlayer and RepairDock.isReconstructionSite() then
+			buyTokenPriceLabel.color = ColorRGB(0, 1, 0)
+			buyTokenPriceLabel.tooltip = "You get a 30% discount for tokens at your Reconstruction Site!"%_t
+		else
+			buyTokenPriceLabel.color = ColorRGB(1, 1, 1)
+			buyTokenPriceLabel.tooltip = nil
+		end
+	else
+		buyTokenAmountLabel.caption = ""
+		buyTokenNameLabel.caption = ""
+		buyTokenPriceLabel.caption = ""
+
+		buyTokenButton.active = false
+		buyTokenButton.tooltip = nil
+	end
+
+	freeRepairLabel:show()
+
+	local malus, reason = ship:getMalusFactor()
+	if reason and reason == MalusReason.Boarding then
+		priceDescriptionLabel:hide()
+	else
+		priceDescriptionLabel:show()
+	end
 end

@@ -1,3 +1,4 @@
 if onServer() then
-    Player():addScriptOnce("data/scripts/player/ConfigLoaderPlayerHelper.lua")
+	local player = Player()
+	player:addScriptOnce("data/scripts/player/ConfigDownloader.lua") -- Helper functions to download configs from Server
 end

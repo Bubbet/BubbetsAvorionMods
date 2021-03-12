@@ -21,8 +21,8 @@ function PlanGenerator.makeAsyncShipPlan(callback, values, faction, volume, styl
                 volume = volume * deviation
             end
 
-            local plan, path = FactionPacks.getShipPlan(faction, volume, material)
-            if plan then return {plan = plan, path = path}, ... end
+            local plan, turret = FactionPacks.getShipPlan(faction, volume, material)
+            if plan then return {ship = plan, turret = turret}, ... end
 
             local style = PlanGenerator.getShipStyle(faction, styleName)
 
