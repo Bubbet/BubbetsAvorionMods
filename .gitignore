@@ -3,6 +3,7 @@
 !.gitignore
 
 # Mods
+!/AllianceMissions/**
 !/Bubbets_Command_Package/**
 !/Bubbets_UIElements/**
 !/BuildingResourcesAsGoods/**
